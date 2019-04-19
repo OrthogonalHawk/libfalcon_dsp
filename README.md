@@ -11,6 +11,7 @@ The **libfalcon\_dsp** library depends on several other FALCON libraries. The fo
  are used in the current unit tests and builds.
 
 |LIBRARY|TAG|
+|:-----:|:---:|
 |[falcon_makefiles](https://github.com/OrthogonalHawk/falcon_makefiles)|master|   <!-- REQUIRED_BUILD_DEPENDENCY -->
 
 ## Build Instructions
