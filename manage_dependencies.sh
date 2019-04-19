@@ -34,7 +34,12 @@ while true; do
           shift
           exit 0
           ;;
-        *)
+          
+               --)
+          shift
+          break
+          ;;
+                *)
           echo "Internal Error!"
           exit 1
           ;;
@@ -42,7 +47,7 @@ while true; do
 done
 
 # make sure that the user provided one or more command options
-if [ $NUM_OPTS_SET = 0 ] || [ $NUM_OPTS_SET -gt 1]; then
+if [ $NUM_OPTS_SET = 0 ] || [ $NUM_OPTS_SET -gt 1 ]; then
     echo "$USAGE"
     exit 0
 fi
@@ -54,7 +59,7 @@ APP_OR_LIBRARY_README_MD_FILE=README.md
 BUILD_DEPENDENCY_MAGIC_STR="REQUIRED_BUILD_DEPENDENCY"
 
 GIT_REPO_NAME_MAGIC_STR="replace_with_git_repo_name"
-GIT_CLONE_SSH_STR="ssh://git@github.com:OrthogonalHawk/$GIT_REPO_NAME_MAGIC_STR.git"
+GIT_CLONE_STR="git@github.com:OrthogonalHawk/$GIT_REPO_NAME_MAGIC_STR.git"
 
 # verify that the required file exists
 if [ ! -f $APP_OR_LIBRARY_README_MD_FILE ]; then
@@ -72,12 +77,11 @@ grep $BUILD_DEPENDENCY_MAGIC_STR $APP_OR_LIBRARY_README_MD_FILE | while read -r 
     REPO_LINK="$(echo $DEPENDENCY_LINE | cut -d'(' -f2 | cut -d')' -f1)"
     REPO_TAG="$(echo $DEPENDENCY_LINE | cut -d'|' -f3)"
     
-    REPO_LINK_FOR_CLONE="$(echo $GIT_CLONE_SSH_STR | sed "s=${GIT_REPO_NAME_MAGIC_STR}=${REPO_NAME}=g")"
-    
+    REPO_LINK_FOR_CLONE="$(echo $GIT_CLONE_STR | sed "s=${GIT_REPO_NAME_MAGIC_STR}=${REPO_NAME}=g")"
     REPO_CHECKOUT_LOCATION=../$REPO_NAME
     
     if [ ! -z $LIST_DEPS ]; then
-        printf "repo%-48s    tag:%-48s \n" "$REPO_NAME" "$REPO_TAG"
+        printf "repo: %-48s    tag:%-48s \n" "$REPO_NAME" "$REPO_TAG"
     fi
     
     if [ ! -z $DOWNLOAD_DEPS ]; then
@@ -100,7 +104,7 @@ grep $BUILD_DEPENDENCY_MAGIC_STR $APP_OR_LIBRARY_README_MD_FILE | while read -r 
             fi
             
         else
-        
+            
             # since the directory does not exist it will be created during the Git
             #  clone operation
             if ! git clone $REPO_LINK_FOR_CLONE $REPO_CHECKOUT_LOCATION; then
@@ -119,3 +123,5 @@ grep $BUILD_DEPENDENCY_MAGIC_STR $APP_OR_LIBRARY_README_MD_FILE | while read -r 
         
         cd $CUR_WORKING_DIR
     fi
+    
+done
