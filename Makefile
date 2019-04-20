@@ -50,7 +50,7 @@ CC_SOURCES = \
     src/math/falcon_dsp_add.cc \
     
 CUDA_SOURCES = \
-    src/add.cu \
+    src/math/falcon_dsp_add_cuda.cu \
     
 ###############################################################################
 # Include ../falcon_makefiles/Makefile.libs for rules
@@ -68,3 +68,5 @@ CPPFLAGS += -std=c++11 -O3
 INC_PATH += \
     -I./hdr \
     -I./hdr/math \
+    
+NVCCFLAGS += $(INC_PATH)

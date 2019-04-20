@@ -25,15 +25,16 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_add.cc
+ * @file     falcon_dsp_math_unit_tests.cc
  * @author   OrthogonalHawk
  * @date     19-Apr-2019
  *
- * @brief    C++ implementation of basic addition operations.
+ * @brief    Unit tests that exercise various FALCON DSP library math functions.
  *
  * @section  DESCRIPTION
  *
- * Implements C++ versions of basic addition operations.
+ * Implements a Google Test Framework based unit test suite for the FALCON DSP
+ *  library functions.
  *
  * @section  HISTORY
  *
@@ -46,6 +47,9 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <vector>
+
+#include <gtest/gtest.h>
 
 #include "falcon_dsp_math.h"
 
@@ -65,34 +69,60 @@
  *                           FUNCTION IMPLEMENTATION
  *****************************************************************************/
 
-namespace falcon_dsp
+/******************************************************************************
+ *                           UNIT TEST IMPLEMENTATION
+ *****************************************************************************/
+
+TEST(falcon_dsp_math_add, cpp_add_func)
 {
-    /*
-     * @brief Adds two vectors together and places the sums into an output vector
-     * @param[in]  in_a  first vector to add
-     * @param[in]  in_b  second vector to add
-     * @param[out] out   output vector
-     * @return None
-     */
-    template<typename T>
-    void add_vector(std::vector<T>& in_a, std::vector<T>& in_b, std::vector<T>& out)
+    const uint32_t NUM_ELEMENTS = 1e6;
+    
+    std::vector<uint32_t> vec_a;
+    std::vector<uint32_t> vec_b;
+    vec_a.reserve(NUM_ELEMENTS);
+    vec_b.reserve(NUM_ELEMENTS);
+    
+    std::vector<uint32_t> vec_sum;
+    vec_sum.reserve(NUM_ELEMENTS);
+    
+    for (uint32_t ii = 0; ii < NUM_ELEMENTS; ++ii)
     {
-        out.clear();
-        
-        if (in_a.size() == in_b.size())
-        {
-            out.reserve(in_a.size());
-            for (uint32_t ii = 0; ii < in_a.size(); ++ii)
-            {
-                out.push_back(in_a[ii] + in_b[ii]);   
-            }
-        }
+        vec_a.push_back(1);
+        vec_b.push_back(2);
     }
     
-    /* force instantiation for specific types */
-    template void add_vector<uint32_t>(std::vector<uint32_t>& in_a, std::vector<uint32_t>& in_b, std::vector<uint32_t>& out);
+    falcon_dsp::add_vector<uint32_t>(vec_a, vec_b, vec_sum);
+    
+    EXPECT_EQ(vec_sum.size(), NUM_ELEMENTS);
+    for (uint32_t ii = 0; ii < NUM_ELEMENTS && ii < vec_sum.size(); ++ii)
+    {
+        EXPECT_EQ(vec_sum[ii], 3);   
+    }
 }
 
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
+TEST(falcon_dsp_math_add, cuda_add_func)
+{
+    const uint32_t NUM_ELEMENTS = 1e6;
+    
+    std::vector<uint32_t> vec_a;
+    std::vector<uint32_t> vec_b;
+    vec_a.reserve(NUM_ELEMENTS);
+    vec_b.reserve(NUM_ELEMENTS);
+    
+    std::vector<uint32_t> vec_sum;
+    vec_sum.reserve(NUM_ELEMENTS);
+    
+    for (uint32_t ii = 0; ii < NUM_ELEMENTS; ++ii)
+    {
+        vec_a.push_back(1);
+        vec_b.push_back(2);
+    }
+    
+    falcon_dsp::add_vector_cuda<uint32_t>(vec_a, vec_b, vec_sum);
+    
+    EXPECT_EQ(vec_sum.size(), NUM_ELEMENTS);
+    for (uint32_t ii = 0; ii < NUM_ELEMENTS && ii < vec_sum.size(); ++ii)
+    {
+        EXPECT_EQ(vec_sum[ii], 3);   
+    }
+}

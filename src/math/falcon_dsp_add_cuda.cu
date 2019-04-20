@@ -25,15 +25,15 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_add.cc
+ * @file     falcon_dsp_add_cuda.cu
  * @author   OrthogonalHawk
  * @date     19-Apr-2019
  *
- * @brief    C++ implementation of basic addition operations.
+ * @brief    CUDA implementation of basic addition operations.
  *
  * @section  DESCRIPTION
  *
- * Implements C++ versions of basic addition operations.
+ * Implements CUDA versions of basic addition operations.
  *
  * @section  HISTORY
  *
@@ -67,6 +67,17 @@
 
 namespace falcon_dsp
 {
+    /* CUDA kernel function that adds the elements of two arrays */
+    template<typename T>
+    __global__
+    void _add(uint32_t length, T * in_a, T * in_b, T * out)
+    {
+        for (uint32_t ii = 0; ii < length; ii++)
+        {
+            out[ii] = in_a[ii] + in_b[ii];
+        }
+    }
+    
     /*
      * @brief Adds two vectors together and places the sums into an output vector
      * @param[in]  in_a  first vector to add
@@ -75,22 +86,52 @@ namespace falcon_dsp
      * @return None
      */
     template<typename T>
-    void add_vector(std::vector<T>& in_a, std::vector<T>& in_b, std::vector<T>& out)
+    void add_vector_cuda(std::vector<T>& in_a, std::vector<T>& in_b, std::vector<T>& out)
     {
         out.clear();
         
         if (in_a.size() == in_b.size())
         {
             out.reserve(in_a.size());
+            
+            /* create pointers for CUDA/device memory */
+            T * in_a_cuda_mem = nullptr;
+            T * in_b_cuda_mem = nullptr;
+            T * out_cuda_mem = nullptr;
+            
+            /* allocate unified memory, which is accessible from CPU or GPU */
+            cudaMallocManaged(&in_a_cuda_mem, in_a.size() * sizeof(T));
+            cudaMallocManaged(&in_b_cuda_mem, in_a.size() * sizeof(T));
+            cudaMallocManaged(&out_cuda_mem,  in_a.size() * sizeof(T));
+            
+            /* initialize CUDA memory by copying in the input vectors */
             for (uint32_t ii = 0; ii < in_a.size(); ++ii)
             {
-                out.push_back(in_a[ii] + in_b[ii]);   
+                in_a_cuda_mem[ii] = in_a[ii];
+                in_b_cuda_mem[ii] = in_b[ii];   
             }
+            
+            /* run kernel on the GPU */
+            _add<<<1, 1>>>(in_a.size(), in_a_cuda_mem, in_b_cuda_mem, out_cuda_mem);
+
+            /* wait for GPU to finish before accessing on host */
+            cudaDeviceSynchronize();
+            
+            /* populate the caller's output vector */
+            for (uint32_t ii = 0; ii < in_a.size(); ++ii)
+            {
+                out.push_back(out_cuda_mem[ii]);   
+            }
+            
+            /* cleanup the CUDA memory that was allocated previously */
+            cudaFree(in_a_cuda_mem);
+            cudaFree(in_b_cuda_mem);
+            cudaFree(out_cuda_mem);
         }
     }
     
     /* force instantiation for specific types */
-    template void add_vector<uint32_t>(std::vector<uint32_t>& in_a, std::vector<uint32_t>& in_b, std::vector<uint32_t>& out);
+    template void add_vector_cuda<uint32_t>(std::vector<uint32_t>& in_a, std::vector<uint32_t>& in_b, std::vector<uint32_t>& out);
 }
 
 /******************************************************************************

@@ -32,8 +32,9 @@
 ###############################################################################
 
 FALCON_PATH = $(realpath $(CURDIR)/../..)
-
-BUILD_OBJS_DIR = build$(LIB_SUFFIX)
+PLATFORM_BUILD=1
+export PLATFORM_BUILD
+#BUILD_OBJS_DIR = build$(LIB_SUFFIX)
 
 ###############################################################################
 # LIBRARY
@@ -46,11 +47,14 @@ EXE = bin/falcon_dsp_unit_tests
 ###############################################################################
 
 CC_SOURCES = \
+    ../src/math/falcon_dsp_add.cc \
+    tests/math/falcon_dsp_math_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
     unit_test_main.cc \
     
 CUDA_SOURCES = \
+    ../src/math/falcon_dsp_add_cuda.cu \
     
 ###############################################################################
 # Include ../../falcon_makefiles/Makefile.apps for rules
@@ -65,5 +69,10 @@ include ../../falcon_makefiles/Makefile.apps
 CPPFLAGS += -Werror -Wall -Wextra -Wcast-align -Wno-type-limits
 CPPFLAGS += -std=c++11 -O3
 
-INC_PATH += -I/usr/src/googletest/googletest \
-            -I/usr/src/googletest/googlemock \
+INC_PATH += \
+    -I../hdr \
+    -I../hdr/math \
+    -I/usr/src/googletest/googletest \
+    -I/usr/src/googletest/googlemock \
+
+NVCCFLAGS += $(INC_PATH)
