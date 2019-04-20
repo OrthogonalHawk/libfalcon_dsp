@@ -32,6 +32,8 @@
 ###############################################################################
 
 FALCON_PATH = $(realpath $(CURDIR)/..)
+PLATFORM_BUILD=1
+export PLATFORM_BUILD
 BUILD_OBJS_DIR = build$(LIB_SUFFIX)
 
 ###############################################################################
@@ -45,6 +47,7 @@ LIB = lib/libfalcon_dsp$(LIB_SUFFIX).a
 ###############################################################################
 
 CC_SOURCES = \
+    src/math/falcon_dsp_add.cc \
     
 CUDA_SOURCES = \
     src/add.cu \
@@ -61,3 +64,7 @@ include ../falcon_makefiles/Makefile.libs
 
 CPPFLAGS += -Werror -Wall -Wextra -Wcast-align -Wno-type-limits
 CPPFLAGS += -std=c++11 -O3
+
+INC_PATH += \
+    -I./hdr \
+    -I./hdr/math \
