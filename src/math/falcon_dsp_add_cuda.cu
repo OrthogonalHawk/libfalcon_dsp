@@ -72,7 +72,9 @@ namespace falcon_dsp
     __global__
     void _add(uint32_t length, T * in_a, T * in_b, T * out)
     {
-        for (uint32_t ii = 0; ii < length; ii++)
+        uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+        uint32_t stride = blockDim.x * gridDim.x;
+        for (uint32_t ii = index; ii < length; ii += stride)
         {
             out[ii] = in_a[ii] + in_b[ii];
         }
@@ -108,11 +110,13 @@ namespace falcon_dsp
             for (uint32_t ii = 0; ii < in_a.size(); ++ii)
             {
                 in_a_cuda_mem[ii] = in_a[ii];
-                in_b_cuda_mem[ii] = in_b[ii];   
+                in_b_cuda_mem[ii] = in_b[ii];
             }
             
             /* run kernel on the GPU */
-            _add<<<1, 1>>>(in_a.size(), in_a_cuda_mem, in_b_cuda_mem, out_cuda_mem);
+            uint32_t thread_block_size = 256;
+            uint32_t num_thread_blocks = (in_a.size() + thread_block_size - 1) / thread_block_size;
+            _add<<<num_thread_blocks, thread_block_size>>>(in_a.size(), in_a_cuda_mem, in_b_cuda_mem, out_cuda_mem);
 
             /* wait for GPU to finish before accessing on host */
             cudaDeviceSynchronize();
