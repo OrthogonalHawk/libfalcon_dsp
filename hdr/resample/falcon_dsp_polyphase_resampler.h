@@ -136,6 +136,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace falcon_dsp
 {
+    /* @brief C++ implementation of a polyphase resampler
+     */
     template<class T, class C>
     class falcon_dsp_polyphase_resampler
     {
@@ -152,9 +154,9 @@ namespace falcon_dsp
         falcon_dsp_polyphase_resampler(const falcon_dsp_polyphase_resampler&) = delete;
 
         void reset_state(void);
-        virtual bool apply(std::vector<input_type>& in, std::vector<output_type>& out);
-        uint32_t     needed_out_count(uint32_t inCount);
-        uint32_t     coeffs_per_phase() { return m_coeffs_per_phase; }
+        virtual int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out);
+        uint32_t        needed_out_count(uint32_t inCount);
+        uint32_t        coeffs_per_phase() { return m_coeffs_per_phase; }
 
     private:
     
@@ -174,8 +176,14 @@ namespace falcon_dsp
     
     /* specific implementation of this template class */
     template<>
-    bool falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+    int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
     
+    
+    /* @brief CUDA implementation of a polyphase resampler
+     * @description Derives from the C++ version since there is significant overlap
+     *               in implementation. CUDA vs. C++ differentiation in the 'apply'
+     *               method when the resampling is performed.
+     */
     template<class T, class C>
     class falcon_dsp_polyphase_resampler_cuda : falcon_dsp_polyphase_resampler<T, C>
     {
@@ -188,14 +196,14 @@ namespace falcon_dsp
         falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
         ~falcon_dsp_polyphase_resampler_cuda(void);
         
-        bool apply(std::vector<input_type>& in, std::vector<output_type>& out);
+        int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out);
     
     private:
     };
     
     /* specific implementation of this template class */
     template <>
-    bool falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+    int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
 
 /******************************************************************************

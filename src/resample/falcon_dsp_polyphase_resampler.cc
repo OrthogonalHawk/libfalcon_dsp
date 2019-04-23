@@ -190,7 +190,7 @@ namespace falcon_dsp
 
     /* generic implementation */
     template<class T, class C>
-    bool falcon_dsp_polyphase_resampler<T, C>::apply(std::vector<input_type>& in, std::vector<output_type>& out)
+    int32_t falcon_dsp_polyphase_resampler<T, C>::apply(std::vector<input_type>& in, std::vector<output_type>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
@@ -267,7 +267,7 @@ namespace falcon_dsp
     
     /* specific implementation for complex<float> */
     template<>
-    bool falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
+    int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
