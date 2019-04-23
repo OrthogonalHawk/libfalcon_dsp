@@ -48,6 +48,7 @@ LIB = lib/libfalcon_dsp$(LIB_SUFFIX).a
 
 CC_SOURCES = \
     src/math/falcon_dsp_add.cc \
+    src/resample/falcon_dsp_polyphase_resampler.cc \
     
 CUDA_SOURCES = \
     src/math/falcon_dsp_add_cuda.cu \
@@ -68,5 +69,6 @@ CPPFLAGS += -std=c++11 -O3
 INC_PATH += \
     -I./hdr \
     -I./hdr/math \
+    -I./hdr/resample
     
 NVCCFLAGS += $(INC_PATH)
