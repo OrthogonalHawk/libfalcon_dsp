@@ -52,6 +52,7 @@ CC_SOURCES = \
     
 CUDA_SOURCES = \
     src/math/falcon_dsp_add_cuda.cu \
+    src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
     
 ###############################################################################
 # Include ../falcon_makefiles/Makefile.libs for rules
@@ -71,4 +72,4 @@ INC_PATH += \
     -I./hdr/math \
     -I./hdr/resample
     
-NVCCFLAGS += $(INC_PATH)
+NVCCFLAGS += $(INC_PATH) -std=c++11 -O3

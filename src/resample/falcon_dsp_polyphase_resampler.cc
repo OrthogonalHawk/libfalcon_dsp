@@ -350,7 +350,6 @@ namespace falcon_dsp
     
     /* force instantiation for specific types */
     template class falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>;
-    template class falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>;
 }
 
 /******************************************************************************

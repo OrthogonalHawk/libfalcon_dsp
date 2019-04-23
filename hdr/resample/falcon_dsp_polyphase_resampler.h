@@ -158,7 +158,7 @@ namespace falcon_dsp
         uint32_t        needed_out_count(uint32_t inCount);
         uint32_t        coeffs_per_phase() { return m_coeffs_per_phase; }
 
-    private:
+    protected:
     
         std::mutex m_mutex;
         uint32_t   m_up_rate;
@@ -185,7 +185,7 @@ namespace falcon_dsp
      *               method when the resampling is performed.
      */
     template<class T, class C>
-    class falcon_dsp_polyphase_resampler_cuda : falcon_dsp_polyphase_resampler<T, C>
+    class falcon_dsp_polyphase_resampler_cuda : public falcon_dsp_polyphase_resampler<T, C>
     {
     public:
         
@@ -196,14 +196,14 @@ namespace falcon_dsp
         falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
         ~falcon_dsp_polyphase_resampler_cuda(void);
         
-        int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out);
+        int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out) override;
     
     private:
     };
     
     /* specific implementation of this template class */
-    template <>
-    int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+    //template <>
+    //int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
 
 /******************************************************************************
