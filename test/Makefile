@@ -48,6 +48,7 @@ EXE = bin/falcon_dsp_unit_tests
 
 CC_SOURCES = \
     ../src/math/falcon_dsp_add.cc \
+    ../src/resample/falcon_dsp_polyphase_resampler.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
@@ -55,6 +56,7 @@ CC_SOURCES = \
     
 CUDA_SOURCES = \
     ../src/math/falcon_dsp_add_cuda.cu \
+    ../src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
     
 ###############################################################################
 # Include ../../falcon_makefiles/Makefile.apps for rules
@@ -72,6 +74,7 @@ CPPFLAGS += -std=c++11 -O3
 INC_PATH += \
     -I../hdr \
     -I../hdr/math \
+    -I../hdr/resample \
     -I/usr/src/googletest/googletest \
     -I/usr/src/googletest/googlemock \
 
