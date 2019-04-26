@@ -199,6 +199,17 @@ namespace falcon_dsp
         int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out) override;
     
     private:
+        
+        bool compute_next_kernel_params(int64_t cur_x_idx, size_t in_size,
+                                        uint32_t& num_in_samples, uint32_t& num_threads, uint32_t& new_t);
+        
+        /* variables for CUDA memory management */
+        void * m_cuda_input_samples;
+        void * m_cuda_output_samples;
+        void * m_cuda_filter_coeffs;
+        
+        uint32_t m_max_num_cuda_input_samples;
+        uint32_t m_max_num_cuda_output_samples;
     };
     
     /* specific implementation of this template class */
