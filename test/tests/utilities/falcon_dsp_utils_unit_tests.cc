@@ -132,9 +132,39 @@ TEST(falcon_dsp_utils, gcd)
     
     /* Python 3.6.7 **********************************************************
      * >>> import math
+     * >>> math.gcd(200, 600)
+     * 200
+     *************************************************************************/
+    val = falcon_dsp::calculate_gcd(200, 600);
+    EXPECT_EQ(val, 200);
+    
+    /* Python 3.6.7 **********************************************************
+     * >>> import math
+     * >>> math.gcd(600, 200)
+     * 200
+     *************************************************************************/
+    val = falcon_dsp::calculate_gcd(600, 200);
+    EXPECT_EQ(val, 200);
+    
+    /* Python 3.6.7 **********************************************************
+     * >>> import math
      * >>> math.gcd(2857, 97)  # prime numbers
      * 1
      *************************************************************************/
     val = falcon_dsp::calculate_gcd(2857, 97);
     EXPECT_EQ(val, 1);
+}
+
+TEST(falcon_dsp_utils, lcm)
+{
+    uint64_t val = 0;
+    
+    val = falcon_dsp::calculate_lcm(382, 164);
+    EXPECT_EQ(val, 31324);
+    
+    val = falcon_dsp::calculate_lcm(600, 200);
+    EXPECT_EQ(val, 600);
+    
+    val = falcon_dsp::calculate_lcm(200, 600);
+    EXPECT_EQ(val, 600);
 }

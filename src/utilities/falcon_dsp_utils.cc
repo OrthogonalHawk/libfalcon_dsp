@@ -48,6 +48,7 @@
  *****************************************************************************/
 
 #include <cmath>
+#include <iostream>
 #include <stdint.h>
 
 #include "utilities/falcon_dsp_utils.h"
