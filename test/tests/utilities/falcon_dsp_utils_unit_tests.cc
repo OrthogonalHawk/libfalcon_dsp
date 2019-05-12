@@ -25,15 +25,16 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_utils.h
+ * @file     falcon_dsp_utils_unit_tests.cc
  * @author   OrthogonalHawk
  * @date     10-May-2019
  *
- * @brief    Digital Signal Processing utility functions; C++ implementation.
+ * @brief    Unit tests that exercise various FALCON DSP library utility functions.
  *
  * @section  DESCRIPTION
  *
- * Defines various utility functions supported by the FALCON DSP library.
+ * Implements a Google Test Framework based unit test suite for the FALCON DSP
+ *  library functions.
  *
  * @section  HISTORY
  *
@@ -41,14 +42,16 @@
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_UTILS_H__
-#define __FALCON_DSP_UTILS_H__
-
 /******************************************************************************
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <stdint.h>
 #include <vector>
+
+#include <gtest/gtest.h>
+
+#include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -63,47 +66,38 @@
  *****************************************************************************/
 
 /******************************************************************************
- *                           FUNCTION DECLARATION
+ *                           FUNCTION IMPLEMENTATION
  *****************************************************************************/
-
-namespace falcon_dsp
-{
-    /* @brief Computes the greatest common denominator between two numbers
-     * @param[in] a - first value to consider
-     * @param[in] b - second value to consider
-     * @return Returns the greatest common denominator between a and b
-     */
-    uint64_t calculate_gcd(uint64_t a, uint64_t b);
-    
-    /* @brief Computes the least common multiple between two numbers
-     * @param[in] a - first value to consider
-     * @param[in] b - second value to consider
-     * @return Returns the least common multiple between a and b
-     */
-    uint64_t calculate_lcm(uint64_t a, uint64_t b);
-    
-    /* @brief Returns the factorial of x
-     * @param[in] - input value
-     * @return Returns the factorial of x
-     */
-    uint64_t factorial(uint32_t x);
-    
-    /* @brief FIR Low-Pass Filter Coefficient generation
-     * @description Source code from http://digitalsoundandmusic.com/download/programmingexercises/Creating_FIR_Filters_in_C++.pdf
-     * @param[in]  M      - filter length in number of taps
-     * @param[in]  fc     - cutoff frequency in Hz (un-normalized). Note that a normalized
-     *                       cutoff frequency can be used, but then fsamp should be set
-     *                       to 1 so that is not used to normalize fc again.
-     * @param[in]  fsamp  - sampling frequency of the signal to be filtered in Hz. fsamp
-     *                       is used to normalize the cutoff frequency.
-     * @param[out] coeffs - FIR filter coefficients
-     * @return true if the coefficients were generated successfully; false otherwise.
-     */
-    bool firlpf(uint32_t M, double fc, double fsamp, std::vector<double>& coeffs);
-}
 
 /******************************************************************************
- *                            CLASS DECLARATION
+ *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-#endif // __FALCON_DSP_UTILS_H__
+TEST(falcon_dsp_utils, gcd)
+{
+    uint64_t val = 0;
+    
+    /* Python 3.6.7 **********************************************************
+     * >>> import math
+     * >>> math.gcd(200, 100)
+     * 100
+     *************************************************************************/
+    val = falcon_dsp::calculate_gcd(200, 100);
+    EXPECT_EQ(val, 100);
+    
+    /* Python 3.6.7 **********************************************************
+     * >>> import math
+     * >>> math.gcd(840, 210)
+     * 210
+     *************************************************************************/
+    val = falcon_dsp::calculate_gcd(840, 210);
+    EXPECT_EQ(val, 210);
+    
+    /* Python 3.6.7 **********************************************************
+     * >>> import math
+     * >>> math.gcd(2857, 97)  # prime numbers
+     * 1
+     *************************************************************************/
+    val = falcon_dsp::calculate_gcd(2857, 97);
+    EXPECT_EQ(val, 1);
+}

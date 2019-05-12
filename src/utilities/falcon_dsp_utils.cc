@@ -70,6 +70,42 @@
 
 namespace falcon_dsp
 {
+    /* @brief Computes the greatest common denominator between two numbers
+     * @param[in] a - first value to consider
+     * @param[in] b - second value to consider
+     * @return Returns the greatest common denominator between a and b
+     */
+    uint64_t calculate_gcd(uint64_t a, uint64_t b)
+    {
+        return b == 0 ? a : calculate_gcd(b, a % b);    
+    }
+    
+    /* @brief Computes the least common multiple between two numbers
+     * @param[in] a - first value to consider
+     * @param[in] b - second value to consider
+     * @return Returns the least common multiple between a and b
+     */
+    uint64_t calculate_lcm(uint64_t a, uint64_t b)
+    {
+        uint64_t gcd = calculate_gcd(a, b);
+        return ((a / gcd) * b);
+    }
+    
+    /* @brief Returns the factorial of x
+     * @param[in] - input value
+     * @return Returns the factorial of x
+     */
+    uint64_t factorial(uint32_t x)
+    {
+        uint64_t ret = 1;
+        for (uint32_t ii = 1; ii <= x; ++ii)
+        {
+            ret *= ii;    
+        }
+        
+        return ret;
+    }
+    
     /* @brief FIR Low-Pass Filter Coefficient generation
      * @description Source code from http://digitalsoundandmusic.com/download/programmingexercises/Creating_FIR_Filters_in_C++.pdf
      * @param[in]  M      - filter length in number of taps

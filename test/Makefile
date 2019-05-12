@@ -49,7 +49,9 @@ EXE = bin/falcon_dsp_unit_tests
 CC_SOURCES = \
     ../src/math/falcon_dsp_add.cc \
     ../src/resample/falcon_dsp_polyphase_resampler.cc \
+    ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
+    tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
     unit_test_main.cc \
