@@ -40,6 +40,7 @@
  * @section  HISTORY
  *
  * 10-May-2019  OrthogonalHawk  File created.
+ * 26-May-2019  OrthogonalHawk  Added binary file read/write functions.
  *
  *****************************************************************************/
 
