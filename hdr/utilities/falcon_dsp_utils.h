@@ -48,6 +48,7 @@
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <complex>
 #include <vector>
 
 /******************************************************************************
@@ -100,6 +101,20 @@ namespace falcon_dsp
      * @return true if the coefficients were generated successfully; false otherwise.
      */
     bool firlpf(uint32_t M, double fc, double fsamp, std::vector<double>& coeffs);
+    
+    /* @brief Writes a complex data vector to a file
+     * @param file_name   - Name of the file to write
+     * @param data        - Data vector to write
+     * @return true if the file was written successfully; false otherwise.
+     */
+    bool write_complex_data_to_file(std::string file_name, std::vector<std::complex<int16_t>>& data);
+    
+    /* @brief Reads complex data vector from a file
+     * @param[in] file_name   - Name of the file to read
+     * @param[out] data       - Data vector read from the file
+     * @return true if the file was read successfully; false otherwise.
+     */
+    bool read_complex_data_from_file(std::string file_name, std::vector<std::complex<int16_t>>& data);
 }
 
 /******************************************************************************
