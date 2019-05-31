@@ -207,6 +207,14 @@ namespace falcon_dsp
 
             output_file.close();
         }
+        else if (type == file_type_e::ASCII)
+        {
+            ret = false;
+        }
+        else
+        {
+            ret = false;
+        }
         
         return ret;
     }
@@ -254,6 +262,14 @@ namespace falcon_dsp
                     return false;
                 }
             }
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            ret = false;
+        }
+        else
+        {
+            ret = false;
         }
         
         return ret;
