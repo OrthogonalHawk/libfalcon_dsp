@@ -172,10 +172,10 @@ TEST(falcon_dsp_utils, lcm)
 TEST(falcon_dsp_utils, file_write_and_read_00)
 {
     std::vector<std::complex<int16_t>> out_data = { {0, 0}, {1, 0}, {0, 1}, {1, 1} };
-    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file("tmp_file.bin", out_data));
+    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file("tmp_file.bin", falcon_dsp::file_type_e::BINARY, out_data));
     
     std::vector<std::complex<int16_t>> in_data;
-    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file.bin", in_data));
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file.bin", falcon_dsp::file_type_e::BINARY, in_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
     for (uint32_t ii = 0; ii < out_data.size() && ii < in_data.size(); ++ii)
@@ -188,10 +188,10 @@ TEST(falcon_dsp_utils, file_write_and_read_00)
 TEST(falcon_dsp_utils, file_write_and_read_01)
 {
     std::vector<std::complex<int16_t>> out_data = { {0, 0}, {-1, 0}, {0, -1}, {-1, -1} };
-    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file("tmp_file.bin", out_data));
+    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file("tmp_file.bin", falcon_dsp::file_type_e::BINARY, out_data));
     
     std::vector<std::complex<int16_t>> in_data;
-    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file.bin", in_data));
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file.bin", falcon_dsp::file_type_e::BINARY, in_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
     for (uint32_t ii = 0; ii < out_data.size() && ii < in_data.size(); ++ii)

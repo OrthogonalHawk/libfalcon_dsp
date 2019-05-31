@@ -174,77 +174,85 @@ namespace falcon_dsp
     
     /* @brief Writes a complex data vector to a file
      * @param file_name   - Name of the file to write
+     * @param type        - File type/format
      * @param data        - Data vector to write
      * @return true if the file was written successfully; false otherwise.
      */
-    bool write_complex_data_to_file(std::string file_name, std::vector<std::complex<int16_t>>& data)
+    bool write_complex_data_to_file(std::string file_name, file_type_e type, std::vector<std::complex<int16_t>>& data)
     {
         bool ret = true;
         
-        /* attempt to open the output file */
-        std::ofstream output_file(file_name, std::ios::out | std::ios::binary);
-        if (!output_file.is_open())
+        if (type == file_type_e::BINARY)
         {
-            return false;
-        }
-        
-        for (auto iter = data.begin(); iter != data.end(); ++iter)
-        {
-            int16_t real = iter->real();
-            int16_t imag = iter->imag();
-            
-            output_file.write(reinterpret_cast<char *>(&real), sizeof(int16_t));
-            output_file.write(reinterpret_cast<char *>(&imag), sizeof(int16_t));
-            
-            if (!output_file.good())
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out | std::ios::binary);
+            if (!output_file.is_open())
             {
                 return false;
             }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                int16_t real = iter->real();
+                int16_t imag = iter->imag();
+
+                output_file.write(reinterpret_cast<char *>(&real), sizeof(int16_t));
+                output_file.write(reinterpret_cast<char *>(&imag), sizeof(int16_t));
+
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
         }
-        
-        output_file.close();
         
         return ret;
     }
     
     /* @brief Reads complex data vector from a file
      * @param[in] file_name   - Name of the file to read
+     * @param[in] type        - File type/format
      * @param[out] data       - Data vector read from the file
      * @return true if the file was read successfully; false otherwise.
      */
-    bool read_complex_data_from_file(std::string file_name, std::vector<std::complex<int16_t>>& data)
+    bool read_complex_data_from_file(std::string file_name, file_type_e type, std::vector<std::complex<int16_t>>& data)
     {
         bool ret = true;
         data.clear();
         
-        /* attempt to open the input file */
-        std::ifstream input_file(file_name, std::ios::in | std::ios::binary);
-        if (!input_file.is_open())
+        if (type == file_type_e::BINARY)
         {
-            return false;
-        }
-        
-        /* get the file size in bytes */
-        input_file.seekg(0, std::ios::end);
-        auto file_size_in_bytes = input_file.tellg();
-        input_file.seekg(0, std::ios::beg);
-        
-        for (uint32_t ii = 0; ii < file_size_in_bytes / (sizeof(int16_t) * 2); ++ii)
-        {
-            char buf[4];
-            input_file.read(buf, 4);
-            
-            /* note that this code assumes that the binary file was written in a
-             *  little endian format */
-            int16_t real = static_cast<int16_t>(((buf[1] << 8) & 0xFF00) | buf[0]);
-            int16_t imag = static_cast<int16_t>(((buf[3] << 8) & 0XFF00) | buf[2]);
-            
-            data.push_back(std::complex<int16_t>(real, imag));
-            
-            if (!input_file.good())
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in | std::ios::binary);
+            if (!input_file.is_open())
             {
-                data.clear();
                 return false;
+            }
+
+            /* get the file size in bytes */
+            input_file.seekg(0, std::ios::end);
+            auto file_size_in_bytes = input_file.tellg();
+            input_file.seekg(0, std::ios::beg);
+
+            for (uint32_t ii = 0; ii < file_size_in_bytes / (sizeof(int16_t) * 2); ++ii)
+            {
+                char buf[4];
+                input_file.read(buf, 4);
+
+                /* note that this code assumes that the binary file was written in a
+                 *  little endian format */
+                int16_t real = static_cast<int16_t>(((buf[1] << 8) & 0xFF00) | buf[0]);
+                int16_t imag = static_cast<int16_t>(((buf[3] << 8) & 0XFF00) | buf[2]);
+
+                data.push_back(std::complex<int16_t>(real, imag));
+
+                if (!input_file.good())
+                {
+                    data.clear();
+                    return false;
+                }
             }
         }
         

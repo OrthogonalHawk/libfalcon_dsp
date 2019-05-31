@@ -70,6 +70,12 @@
 
 namespace falcon_dsp
 {
+    enum class file_type_e : uint32_t
+    {
+        BINARY = 0,
+        ASCII
+    };
+
     /* @brief Computes the greatest common denominator between two numbers
      * @param[in] a - first value to consider
      * @param[in] b - second value to consider
@@ -108,14 +114,14 @@ namespace falcon_dsp
      * @param data        - Data vector to write
      * @return true if the file was written successfully; false otherwise.
      */
-    bool write_complex_data_to_file(std::string file_name, std::vector<std::complex<int16_t>>& data);
+    bool write_complex_data_to_file(std::string file_name, file_type_e type, std::vector<std::complex<int16_t>>& data);
     
     /* @brief Reads complex data vector from a file
      * @param[in] file_name   - Name of the file to read
      * @param[out] data       - Data vector read from the file
      * @return true if the file was read successfully; false otherwise.
      */
-    bool read_complex_data_from_file(std::string file_name, std::vector<std::complex<int16_t>>& data);
+    bool read_complex_data_from_file(std::string file_name, file_type_e, std::vector<std::complex<int16_t>>& data);
 }
 
 /******************************************************************************
