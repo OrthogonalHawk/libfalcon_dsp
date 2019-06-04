@@ -39,6 +39,7 @@
  *
  * 10-May-2019  OrthogonalHawk  File created.
  * 26-May-2019  OrthogonalHawk  Added binary file read/write functions.
+ * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read functions.
  *
  *****************************************************************************/
 

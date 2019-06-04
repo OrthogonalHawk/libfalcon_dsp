@@ -209,7 +209,27 @@ namespace falcon_dsp
         }
         else if (type == file_type_e::ASCII)
         {
-            ret = false;
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                int16_t real = iter->real();
+                int16_t imag = iter->imag();
+
+                output_file << real << " " << imag << std::endl;
+                
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
         }
         else
         {
@@ -265,7 +285,19 @@ namespace falcon_dsp
         }
         else if (type == file_type_e::ASCII)
         {
-            ret = false;
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in);
+            if (!input_file.is_open())
+            {
+                return false;
+            }
+
+            int16_t real;
+            int16_t imag;
+            while (input_file >> real >> imag)
+            {
+                data.push_back(std::complex<int16_t>(real, imag));
+            }
         }
         else
         {
