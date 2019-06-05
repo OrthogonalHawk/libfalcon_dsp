@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 10-May-2019  OrthogonalHawk  File created.
+ * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read/write tests.
  *
  *****************************************************************************/
 
@@ -209,6 +210,25 @@ TEST(falcon_dsp_utils, file_write_and_read_02)
     
     std::vector<std::complex<int16_t>> in_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file.txt", falcon_dsp::file_type_e::ASCII, in_data));
+    EXPECT_EQ(out_data.size(), in_data.size());
+    
+    for (uint32_t ii = 0; ii < out_data.size() && ii < in_data.size(); ++ii)
+    {
+        EXPECT_EQ(out_data[ii].real(), in_data[ii].real());
+        EXPECT_EQ(out_data[ii].imag(), in_data[ii].imag());
+    }
+}
+
+TEST(falcon_dsp_utils, file_write_and_read_03)
+{
+    std::vector<std::complex<float>> out_data = { { 0.1, 0.2}, {1.3,  0.4}, { 0.5,  1.6}, {1.7, 1.8},
+                                                  {-1.9, 0.0}, {0.1, -1.2}, {-1.3, -1.3}, {0.4, 0.5} };
+    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file("tmp_file_write_and_read_03.txt",
+                                                       falcon_dsp::file_type_e::ASCII, out_data));
+    
+    std::vector<std::complex<float>> in_data;
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file("tmp_file_write_and_read_03.txt",
+                                                        falcon_dsp::file_type_e::ASCII, in_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
     for (uint32_t ii = 0; ii < out_data.size() && ii < in_data.size(); ++ii)

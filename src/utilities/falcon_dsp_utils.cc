@@ -41,6 +41,7 @@
  *
  * 10-May-2019  OrthogonalHawk  File created.
  * 26-May-2019  OrthogonalHawk  Added binary file read/write functions.
+ * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read functions.
  *
  *****************************************************************************/
 
@@ -239,6 +240,53 @@ namespace falcon_dsp
         return ret;
     }
     
+    /* @brief Writes a complex data vector to a file
+     * @param file_name   - Name of the file to write
+     * @param type        - File type/format
+     * @param data        - Data vector to write
+     * @return true if the file was written successfully; false otherwise.
+     */
+    bool write_complex_data_to_file(std::string file_name, file_type_e type, std::vector<std::complex<float>>& data)
+    {
+        bool ret = true;
+        
+        if (type == file_type_e::BINARY)
+        {
+            /* currently not supported */
+            ret = false;
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                float real = iter->real();
+                float imag = iter->imag();
+
+                output_file << real << " " << imag << std::endl;
+                
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
+        }
+        else
+        {
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
     /* @brief Reads complex data vector from a file
      * @param[in] file_name   - Name of the file to read
      * @param[in] type        - File type/format
@@ -297,6 +345,46 @@ namespace falcon_dsp
             while (input_file >> real >> imag)
             {
                 data.push_back(std::complex<int16_t>(real, imag));
+            }
+        }
+        else
+        {
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
+    /* @brief Reads complex data vector from a file
+     * @param[in] file_name   - Name of the file to read
+     * @param[in] type        - File type/format
+     * @param[out] data       - Data vector read from the file
+     * @return true if the file was read successfully; false otherwise.
+     */
+    bool read_complex_data_from_file(std::string file_name, file_type_e type, std::vector<std::complex<float>>& data)
+    {
+        bool ret = true;
+        data.clear();
+        
+        if (type == file_type_e::BINARY)
+        {
+            /* currently not supported */
+            ret = false;
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in);
+            if (!input_file.is_open())
+            {
+                return false;
+            }
+
+            float real;
+            float imag;
+            while (input_file >> real >> imag)
+            {
+                data.push_back(std::complex<float>(real, imag));
             }
         }
         else

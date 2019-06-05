@@ -116,6 +116,7 @@ namespace falcon_dsp
      * @return true if the file was written successfully; false otherwise.
      */
     bool write_complex_data_to_file(std::string file_name, file_type_e type, std::vector<std::complex<int16_t>>& data);
+    bool write_complex_data_to_file(std::string file_name, file_type_e type, std::vector<std::complex<float>>& data);
     
     /* @brief Reads complex data vector from a file
      * @param[in] file_name   - Name of the file to read
@@ -123,6 +124,7 @@ namespace falcon_dsp
      * @return true if the file was read successfully; false otherwise.
      */
     bool read_complex_data_from_file(std::string file_name, file_type_e, std::vector<std::complex<int16_t>>& data);
+    bool read_complex_data_from_file(std::string file_name, file_type_e, std::vector<std::complex<float>>& data);
 }
 
 /******************************************************************************
