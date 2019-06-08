@@ -23,4 +23,14 @@ export RAMP_OUTPUT=0
 
 jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_001.ipynb
 
+# 002 - negative frequency shift test vector, no resampling
+export FREQ_SHIFT=-5000
+export INPUT_SAMPLE_RATE=1000000
+export OUTPUT_SAMPLE_RATE=1000000
+export NUM_OUTPUT_SAMPLES=10000
+export OUT_FILE_NAME=../vectors/test_002
+export RAMP_OUTPUT=0
+
+jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_002.ipynb
+
 cd ../
