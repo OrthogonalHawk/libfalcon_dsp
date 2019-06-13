@@ -25,9 +25,9 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_freq_shift_unit_tests.cc
+ * @file     falcon_dsp_freq_shift_cuda_unit_tests.cu
  * @author   OrthogonalHawk
- * @date     08-Jun-2019
+ * @date     09-Jun-2019
  *
  * @brief    Unit tests that exercise the FALCON DSP frequency shift functions.
  *
@@ -38,7 +38,7 @@
  *
  * @section  HISTORY
  *
- * 08-Jun-2019  OrthogonalHawk  File created.
+ * 09-Jun-2019  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
@@ -74,8 +74,8 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_output_file_name,
-                             uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
+void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_output_file_name,
+                              uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
 {
     std::vector<std::complex<int16_t>> in_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
@@ -90,37 +90,20 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
     /* now frequency shift the input and verify that the calculated output
      *  matches the expected output */
     std::vector<std::complex<int16_t>> out_data;
-    EXPECT_TRUE(falcon_dsp::freq_shift(input_sample_rate_in_sps, in_data,
-                freq_shift_in_hz, out_data));
+    EXPECT_TRUE(falcon_dsp::freq_shift_cuda(input_sample_rate_in_sps, in_data,
+                                            freq_shift_in_hz, out_data));
     
     EXPECT_EQ(in_data.size(), out_data.size());
     
-    for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
+    for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size() && ii < 417250; ++ii)
     {
-        //std::cout << ii << std::endl;
-        
-        float max_real_diff = abs(expected_out_data[ii].real()) * 0.01;
-        if (max_real_diff < 10)
-        {
-            max_real_diff = 10;
-        }
-        
-        float max_imag_diff = abs(expected_out_data[ii].imag()) * 0.01;
-        if (max_imag_diff < 10)
-        {
-            max_imag_diff = 10;
-        }
-        
-         if (ii >= 417214 && ii <= 417220)
-         {
-             std::cout << ii << std::endl;
-         }
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
+        //std::cout << "ii=" << ii << std::endl;
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01);
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01);
     }
 }
 
-TEST(falcon_dsp_transform, cpp_freq_shift_00)
+TEST(falcon_dsp_transform, cuda_freq_shift_00)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_001_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_001_y.bin";
@@ -129,11 +112,11 @@ TEST(falcon_dsp_transform, cpp_freq_shift_00)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const int32_t  FREQ_SHIFT_IN_HZ = 1e5;
     
-    run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
-                            INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+    run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_transform, cpp_freq_shift_01)
+TEST(falcon_dsp_transform, cuda_freq_shift_01)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_002_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_002_y.bin";
@@ -142,6 +125,6 @@ TEST(falcon_dsp_transform, cpp_freq_shift_01)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const int32_t  FREQ_SHIFT_IN_HZ = -5000;
     
-    run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
-                            INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+    run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }

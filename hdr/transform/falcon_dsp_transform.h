@@ -106,8 +106,20 @@ namespace falcon_dsp
         std::mutex m_mutex;
         double     m_samples_handled;
         uint32_t   m_calculated_rollover_sample_idx;
-        double     m_angular_freq;
+        float      m_angular_freq;
     };
+    
+    /* @brief CUDA implementation of a frequency shift vector operation.
+     * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
+     *                                      per second.
+     * @param[in] in                    - input vector
+     * @param[in] freq_shift_in_hz      - amount to frequency shift in Hz
+     * @param[out] out                  - frequency shifted vector
+     * @return True if the input vector was frequency shifted as requested;
+     *          false otherwise.
+     */
+    bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
+                         int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out);
     
     /* @brief CUDA implementation of a frequency shift utility class.
      * @description Derives from the C++ version since there is significant overlap
@@ -132,10 +144,8 @@ namespace falcon_dsp
                                         uint32_t& num_in_samples, uint32_t& num_threads, uint32_t& new_t);
         
         /* variables for CUDA memory management */
-        void * m_cuda_vector;
-        
+        void * m_cuda_data_vector;
         uint32_t m_max_num_cuda_input_samples;
-        uint32_t m_max_num_cuda_output_samples;
     };
 }
 

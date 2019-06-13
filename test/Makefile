@@ -61,6 +61,9 @@ CC_SOURCES = \
 CUDA_SOURCES = \
     ../src/math/falcon_dsp_add_cuda.cu \
     ../src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
+    ../src/transform/falcon_dsp_freq_shift_cuda.cu \
+    tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
+    unit_test_cuda_init.cu \
     
 ###############################################################################
 # Include ../../falcon_makefiles/Makefile.apps for rules

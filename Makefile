@@ -55,6 +55,7 @@ CC_SOURCES = \
 CUDA_SOURCES = \
     src/math/falcon_dsp_add_cuda.cu \
     src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
+    src/transform/falcon_dsp_freq_shift_cuda.cu \
     
 ###############################################################################
 # Include ../falcon_makefiles/Makefile.libs for rules
