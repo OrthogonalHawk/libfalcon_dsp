@@ -74,41 +74,32 @@ namespace falcon_dsp
     /* CUDA kernel function that applies a frequency shift */
     __global__
     void _freq_shift(uint32_t num_samples_handled_previously,
-                     uint32_t rollover_sample_idx,
+                     uint32_t time_shift_rollover_sample_idx,
                      double   angular_freq,
                      cuFloatComplex * data,
                      uint32_t data_size)
     {
-        uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
+        /* retrieve the data index that corresponds to this thread */
+        uint32_t data_index = blockIdx.x * blockDim.x + threadIdx.x;
      
         /* catch the case where the input size is not an integer
          *  multiple of the thread block size */
-        if (index > data_size)
+        if (data_index > data_size)
         {
             return;
         }
         
-        /* compute the sample index for the current thread */
-        uint64_t orig_sample_idx = num_samples_handled_previously + index;
-        uint64_t sample_idx = orig_sample_idx;
+        /* compute the time shift index for the current thread */
+        uint64_t orig_time_shift_idx = num_samples_handled_previously + data_index;
+        uint64_t time_shift_idx = orig_time_shift_idx;
         
         for (uint32_t ii = 0; ii < 1; ++ii)
         {
-            sample_idx += ii;
-            sample_idx %= rollover_sample_idx;
-            if (sample_idx < orig_sample_idx)
-            {
-                printf("Detected a rollover for input sample %lu (%u %u)\n",
-                    orig_sample_idx, num_samples_handled_previously, index);
-            }
-
-            if (sample_idx >= 417214 && sample_idx <= 417220)
-            {
-                printf("cuda input[%u]: (%f,%f)\n", sample_idx, data[sample_idx].x, data[sample_idx].y);
-            }
+            time_shift_idx += ii;
+            time_shift_idx %= time_shift_rollover_sample_idx;
             
             /* compute the frequency shift multiplier value */
-            float angle = angular_freq * sample_idx;
+            float angle = angular_freq * time_shift_idx;
             float real = cosf(angle);
             float imag = sinf(angle);
             
@@ -117,12 +108,8 @@ namespace falcon_dsp
             shift.x = real;
             shift.y = imag;
 
-            if (sample_idx >= 417214 && sample_idx <= 417220)
-            {
-                printf("shift[%u]: angle=%f (%f,%f)\n", sample_idx, angular_freq * sample_idx, real, imag);
-            }
             /* apply the frequency shift in-place */
-            data[sample_idx] = cuCmulf(data[sample_idx], shift);
+            data[data_index] = cuCmulf(data[data_index], shift);
         }
     }
     

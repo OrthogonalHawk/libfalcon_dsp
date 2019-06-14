@@ -104,7 +104,7 @@ namespace falcon_dsp
 
         /* 1e7 was chosen after empirical testing on a Jetson Nano as it did
          *  not seem to trigger the high computational cost case */
-        while (rollover_idx < 1e7)
+        while (rollover_idx < 1e5)
         {
             rollover_idx *= 10;
         }
@@ -112,13 +112,9 @@ namespace falcon_dsp
         /* convert the double to an unsigned integer to get the actual
          *  rollover index value */
         m_calculated_rollover_sample_idx = static_cast<uint32_t>(rollover_idx);
-        
-        std::cout << "Computed rollover index: " << m_calculated_rollover_sample_idx << std::endl;
           
         /* compute the angular frequency since it won't change */
         m_angular_freq = (float(freq_shift_in_hz) / float(input_sample_rate_in_sps)) * 2.0 * M_PI;
-          
-        printf("Computed angular freq: %f using 2*pi=%.16f\n", m_angular_freq, 2.0 * M_PI);
     }
     
     void falcon_dsp_freq_shift::reset_state(void)
@@ -143,12 +139,6 @@ namespace falcon_dsp
                           std::complex<float>(cos(angle),
                                               sin(angle)));
             
-            if (m_samples_handled >= 417214 && m_samples_handled <= 417220)
-            {
-                std::cout << "cpp input[" << m_samples_handled << "]: " << *it << std::endl;
-                printf("cpp shift[%f] angle=%f cos=%f sin=%f\n", m_samples_handled, angle, cos(angle), sin(angle));
-                std::cout << "cpp output[" << m_samples_handled << "]: " << out[m_samples_handled] << std::endl;
-            }
             m_samples_handled++;            
             
             if (m_samples_handled >= m_calculated_rollover_sample_idx)
