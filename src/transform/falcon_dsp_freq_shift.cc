@@ -98,12 +98,22 @@ namespace falcon_dsp
          *  keep the rollover index value small (relatively) due to the computational cost of
          *  computing the sin of a large radian number; see [1] for a related discussion.
          *
+         * After further testing, there is another reason to keep the "t" values small, and it
+         *  appears to be related to Python/numpy floating point precision when computing the
+         *  sine and cosine of large values in radians (large "t" values mean large angle values
+         *  are passed to these functions). Specifically, since Python/numpy are used as the
+         *  reference data source for unit test vectors I've noticed that the sine and cosine
+         *  values begin to diverge between the C++/CUDA calculations and the numpy calculations
+         *  after the angle value gets too high.
+         *
          * [1] https://hackernoon.com/help-my-sin-is-slow-and-my-fpu-is-inaccurate-a2c751106102
          */
         double rollover_idx = static_cast<double>(input_sample_rate_in_sps) / static_cast<double>(abs(freq_shift_in_hz));
 
         /* 1e7 was chosen after empirical testing on a Jetson Nano as it did
-         *  not seem to trigger the high computational cost case */
+         *  not seem to trigger the high computational cost case and kept the
+         *  resulting angle values within a range where the C++/CUDA and
+         *  Python/numpy computations agree with one another. */
         while (rollover_idx < 1e5)
         {
             rollover_idx *= 10;

@@ -155,7 +155,9 @@ namespace falcon_dsp
         out.clear();
         
         /* if there is enough space in previously allocated memory then use it; otherwise
-         *  allocate a new memory buffer */
+         *  allocate a new memory buffer. it is left as a future feature to specify a maximum
+         *  memory size and process the data in chunks instead of requiring enough GPU
+         *  memory to process the whole vector at once */
         if (m_max_num_cuda_input_samples < in.size())
         {
             /* clean up existing memory */
@@ -221,7 +223,3 @@ namespace falcon_dsp
         return out.size() > 0;
     }
 }
-
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
