@@ -33,8 +33,6 @@ export RAMP_OUTPUT=0
 
 jupyter nbconvert --ExecutePreprocessor.timeout=300 --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_002.ipynb
 
-jupyter nbconvert --ExecutePreprocessor.timeout=600 --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_003.ipynb
-
 # 003 - negative frequency shift test vector, no resampling
 export FREQ_SHIFT=-5000
 export INPUT_SAMPLE_RATE=1000000

@@ -147,16 +147,3 @@ TEST(falcon_dsp_transform, cuda_freq_shift_02)
     run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
-
-TEST(falcon_dsp_transform, cuda_freq_shift_03)
-{
-    std::string IN_TEST_FILE_NAME = "vectors/test_004_x.bin";
-    std::string OUT_TEST_FILE_NAME = "vectors/test_004_y.bin";
-    
-    /* values must match settings in generate_test_vectors.sh */
-    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    const int32_t  FREQ_SHIFT_IN_HZ = -5000;
-    
-    run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
-                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
-}
