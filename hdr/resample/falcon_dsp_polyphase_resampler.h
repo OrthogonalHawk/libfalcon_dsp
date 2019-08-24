@@ -174,7 +174,8 @@ namespace falcon_dsp
         uint32_t                    m_xOffset;
     };
     
-    /* specific implementation of this template class */
+    /* specific implementation(s) of this template class; customized for these specific
+     *  templated variable types */
     template<>
     int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
     
