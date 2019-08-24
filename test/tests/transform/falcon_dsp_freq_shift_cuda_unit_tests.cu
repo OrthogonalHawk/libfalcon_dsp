@@ -109,7 +109,7 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
     }
 }
 
-TEST(falcon_dsp_transform, cuda_freq_shift_00)
+TEST(falcon_dsp_transform, cuda_freq_shift_001)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_001_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_001_y.bin";
@@ -122,7 +122,7 @@ TEST(falcon_dsp_transform, cuda_freq_shift_00)
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_transform, cuda_freq_shift_01)
+TEST(falcon_dsp_transform, cuda_freq_shift_002)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_002_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_002_y.bin";
@@ -135,14 +135,14 @@ TEST(falcon_dsp_transform, cuda_freq_shift_01)
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_transform, cuda_freq_shift_02)
+TEST(falcon_dsp_transform, cuda_freq_shift_003)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_003_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_003_y.bin";
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    const int32_t  FREQ_SHIFT_IN_HZ = 1e5;
+    const int32_t  FREQ_SHIFT_IN_HZ = -5000;
     
     run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
