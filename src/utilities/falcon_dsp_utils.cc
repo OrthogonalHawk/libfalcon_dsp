@@ -304,6 +304,7 @@ namespace falcon_dsp
             std::ifstream input_file(file_name, std::ios::in | std::ios::binary);
             if (!input_file.is_open())
             {
+                std::cerr << "Unable to open BINARY input file " << file_name << std::endl;
                 return false;
             }
 
@@ -312,7 +313,8 @@ namespace falcon_dsp
             auto file_size_in_bytes = input_file.tellg();
             input_file.seekg(0, std::ios::beg);
 
-            for (uint32_t ii = 0; ii < file_size_in_bytes / (sizeof(int16_t) * 2); ++ii)
+            uint32_t expected_number_of_samples = file_size_in_bytes / (sizeof(int16_t) * 2);
+            for (uint32_t ii = 0; ii < expected_number_of_samples; ++ii)
             {
                 char buf[4];
                 input_file.read(buf, 4);
@@ -327,6 +329,9 @@ namespace falcon_dsp
                 if (!input_file.good())
                 {
                     data.clear();
+                    
+                    std::cerr << "Reached unexpected EOF at sample index " << ii
+                              << " of " << expected_number_of_samples << std::endl;
                     return false;
                 }
             }
@@ -337,6 +342,7 @@ namespace falcon_dsp
             std::ifstream input_file(file_name, std::ios::in);
             if (!input_file.is_open())
             {
+                std::cerr << "Unable to open ASCII input file " << file_name << std::endl;
                 return false;
             }
 
@@ -349,6 +355,8 @@ namespace falcon_dsp
         }
         else
         {
+            std::cerr << "Unable to open input file " << file_name
+                      << " with unsupported type " << static_cast<uint32_t>(type) << std::endl;
             ret = false;
         }
         
