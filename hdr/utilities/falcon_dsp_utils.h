@@ -40,6 +40,7 @@
  * 10-May-2019  OrthogonalHawk  File created.
  * 26-May-2019  OrthogonalHawk  Added binary file read/write functions.
  * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read functions.
+ * 24-Aug-2019  OrthogonalHawk  Adding rational fraction approximation function.
  *
  *****************************************************************************/
 
@@ -109,6 +110,15 @@ namespace falcon_dsp
      * @return true if the coefficients were generated successfully; false otherwise.
      */
     bool firlpf(uint32_t M, double fc, double fsamp, std::vector<double>& coeffs);
+    
+    /* @brief Rational fraction approximation
+     * @param[in] f       - the number to convert
+     * @param[in] md      - max denominator value
+     * @param[out] num    - computed numerator value
+     * @param[out] denom  - computed denominator value
+     * @attribution This function was obtained from https://rosettacode.org/wiki/Convert_decimal_number_to_rational#C
+     */
+    void rat_approx(double f, int64_t md, int64_t &num, int64_t &denom);
     
     /* @brief Writes a complex data vector to a file
      * @param file_name   - Name of the file to write

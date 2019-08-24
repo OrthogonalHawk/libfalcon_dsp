@@ -170,6 +170,51 @@ TEST(falcon_dsp_utils, lcm)
     EXPECT_EQ(val, 600);
 }
 
+TEST(falcon_dsp_utils, rat_approx)
+{
+    int64_t num, denom;
+
+    /* 'vanilla' case */
+    falcon_dsp::rat_approx(1.0, 1, num, denom);
+    EXPECT_EQ(num, 1);
+    EXPECT_EQ(denom, 1);
+
+    /* check case where max_denom is too small */
+    falcon_dsp::rat_approx(0.5, 1, num, denom);
+    EXPECT_EQ(num, 0);
+    EXPECT_EQ(denom, 1);
+
+    /* check case where max_denom is larger */
+    falcon_dsp::rat_approx(0.5, 10, num, denom);
+    EXPECT_EQ(num, 1);
+    EXPECT_EQ(denom, 2);
+
+    /* 1/3 = 0.33333 */
+    falcon_dsp::rat_approx(0.33333, 100, num, denom);
+    EXPECT_EQ(num, 1);
+    EXPECT_EQ(denom, 3);
+
+    /* 2/7 = 0.28571 */
+    falcon_dsp::rat_approx(0.28571, 100, num, denom);
+    EXPECT_EQ(num, 2);
+    EXPECT_EQ(denom, 7);
+
+    /* 5/8 = 0.625 */
+    falcon_dsp::rat_approx(0.625, 100, num, denom);
+    EXPECT_EQ(num, 5);
+    EXPECT_EQ(denom, 8);
+
+    /* 30720000 / 40000000 = 0.768 */
+    falcon_dsp::rat_approx(0.768, 100, num, denom);
+    EXPECT_EQ(num, 53);
+    EXPECT_EQ(denom, 69);
+
+    /* 40000000 / 30720000 = 1.30208 */
+    falcon_dsp::rat_approx(1.30208, 100, num, denom);
+    EXPECT_EQ(num, 125);
+    EXPECT_EQ(denom, 96);
+}
+
 TEST(falcon_dsp_utils, file_write_and_read_00)
 {
     std::string TEST_FILE_NAME = "vectors/tmp_file.bin";

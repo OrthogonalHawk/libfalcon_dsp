@@ -42,6 +42,7 @@
  * 10-May-2019  OrthogonalHawk  File created.
  * 26-May-2019  OrthogonalHawk  Added binary file read/write functions.
  * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read functions.
+ * 24-Aug-2019  OrthogonalHawk  Adding rational fraction approximation function.
  *
  *****************************************************************************/
 
@@ -173,6 +174,85 @@ namespace falcon_dsp
         return true;
     }
     
+    /* @brief Rational fraction approximation
+     * @param[in] f       - the number to convert
+     * @param[in] md      - max denominator value
+     * @param[out] num    - computed numerator value
+     * @param[out] denom  - computed denominator value
+     * @attribution This function was obtained from https://rosettacode.org/wiki/Convert_decimal_number_to_rational#C
+     * @note The maximum denominator value is specified because machine floating
+     *        point number has a finite resolution (10e-16 ish for 64 bit double),
+     *        so specifying a "best match with minimal error" is often wrong,
+     *        because one can always just retrieve the significand and return that
+     *        divided by 2**52, which is in a sense accurate, but generally not very
+     *        useful:
+     *          1.0/7.0 would be "2573485501354569/18014398509481984", for example.
+     */
+    void rat_approx(double f, int64_t md, int64_t &num, int64_t &denom)
+    {
+        /*  a: continued fraction coefficients. */
+        int64_t a, h[3] = { 0, 1, 0 }, k[3] = { 1, 0, 0 };
+        int64_t x, d, n = 1;
+        int32_t i, neg = 0;
+
+        /* sanity check inputs */
+        if (md <= 1)
+        {
+            denom = 1;
+            num = static_cast<int64_t>(f);
+            return;
+        }
+
+        /* handle negative numbers as well */
+        if (f < 0)
+        {
+            neg = 1;
+            f = -f;
+        }
+
+        while (f != floor(f))
+        {
+            n <<= 1;
+            f *= 2;
+        }
+
+        d = f;
+
+        /* continued fraction and check denominator each step */
+        for (i = 0; i < 64; i++)
+        {
+            a = n ? d / n : 0;
+            if (i && !a)
+            {
+                break;
+            }
+
+            x = d;
+            d = n;
+            n = x % n;
+
+            x = a;
+		    if (k[1] * a + k[0] >= md)
+            {
+			    x = (md - k[0]) / k[1];
+			    if (x * 2 >= a || k[1] >= md)
+                {
+				    i = 65;
+                }
+			    else
+                {
+				    break;
+                }
+            }
+
+            h[2] = x * h[1] + h[0]; h[0] = h[1]; h[1] = h[2];
+            k[2] = x * k[1] + k[0]; k[0] = k[1]; k[1] = k[2];
+        }
+
+        denom = k[1];
+        num = neg ? -h[1] : h[1];
+    }
+
     /* @brief Writes a complex data vector to a file
      * @param file_name   - Name of the file to write
      * @param type        - File type/format
