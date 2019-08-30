@@ -85,6 +85,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <iostream>
 #include <stdint.h>
 
 #include "resample/falcon_dsp_polyphase_resampler.h"
@@ -119,16 +120,16 @@ namespace falcon_dsp
      * @return True if the input vector was resampled as requested;
      *          false otherwise.
      */
-    bool resample(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
-                  std::vector<float>& filter_coeffs,
-                  uint32_t out_sample_rate_in_sps, std::vector<std::complex<int16_t>>& out)
+    bool resample(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                  std::vector<std::complex<float>>& filter_coeffs,
+                  uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out)
     {
         /* compute the required up and down sample rates */
         int64_t up_rate, down_rate;
-        double decimal = static_cast<double>(in_sample_rate_in_sps) / static_cast<double>(out_sample_rate_in_sps);
+        double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler<std::complex<int16_t>, float> resampler(up_rate, down_rate, filter_coeffs);
+        falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>> resampler(up_rate, down_rate, filter_coeffs);
         return resampler.apply(in, out) > 0;
     }
     
@@ -136,9 +137,9 @@ namespace falcon_dsp
      *         refers to "upsampling", followed by "fir" or Finite Impulse Response (FIR)
      *         filtering, and then "downsampling" (i.e. "dn").
      */
-    bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
-                 std::vector<float>& filter_coeffs,
-                 uint32_t out_sample_rate_in_sps, std::vector<std::complex<int16_t>>& out)
+    bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                 std::vector<std::complex<float>>& filter_coeffs,
+                 uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out)
     {
         return resample(in_sample_rate_in_sps, in, filter_coeffs, out_sample_rate_in_sps, out);
     }

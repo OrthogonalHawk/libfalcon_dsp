@@ -82,17 +82,17 @@ namespace falcon_dsp
      * @return True if the input vector was resampled as requested;
      *          false otherwise.
      */
-    bool resample(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
-                  std::vector<float>& filter_coeffs,
-                  uint32_t out_sample_rate_in_sps, std::vector<std::complex<int16_t>>& out);
+    bool resample(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                  std::vector<std::complex<float>>& filter_coeffs,
+                  uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out);
     
     /* @brief Same implementation as 'resample', just with a different name. The "up"
      *         refers to "upsampling", followed by "fir" or Finite Impulse Response (FIR)
      *         filtering, and then "downsampling" (i.e. "dn").
      */
-    bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
+    bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                  std::vector<float>& filter_coeffs,
-                 uint32_t out_sample_rate_in_sps, std::vector<std::complex<int16_t>>& out);
+                 uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out);
 }
 
 /******************************************************************************
