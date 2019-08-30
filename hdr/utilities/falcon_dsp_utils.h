@@ -78,6 +78,16 @@ namespace falcon_dsp
         ASCII
     };
 
+    /* @brief Computes filter delay in terms of samples
+     * @description Computes the filter delay in samples based on the provided
+     *               filter coefficients and resampling ratio.
+     * @param[in]  coeffs                   - filter coefficients
+     * @param[in]  in_sample_rate_in_sps    - input data sample rate in samples per second
+     * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
+     * @return Filter delay  in samples
+     */
+    uint32_t calculate_filter_delay(std::vector<std::complex<float>> &coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps);
+
     /* @brief Computes the greatest common denominator between two numbers
      * @param[in] a - first value to consider
      * @param[in] b - second value to consider
@@ -97,7 +107,7 @@ namespace falcon_dsp
      * @return Returns the factorial of x
      */
     uint64_t factorial(uint32_t x);
-    
+
     /* @brief FIR Low-Pass Filter Coefficient generation
      * @description Source code from http://digitalsoundandmusic.com/download/programmingexercises/Creating_FIR_Filters_in_C++.pdf
      * @param[in]  M      - filter length in number of taps
