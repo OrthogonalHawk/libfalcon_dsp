@@ -48,10 +48,12 @@ EXE = bin/falcon_dsp_unit_tests
 
 CC_SOURCES = \
     ../src/math/falcon_dsp_add.cc \
+    ../src/resample/falcon_dsp_resample.cc \
     ../src/resample/falcon_dsp_polyphase_resampler.cc \
     ../src/transform/falcon_dsp_freq_shift.cc \
     ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
+    tests/resample/falcon_dsp_polyphase_resample_unit_tests.cc \
     tests/transform/falcon_dsp_freq_shift_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
