@@ -85,10 +85,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <iostream>
 #include <cuComplex.h>
 #include <stdint.h>
 
-#include "falcon_dsp_polyphase_resampler.h"
+#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -122,6 +123,8 @@ namespace falcon_dsp
         m_max_num_cuda_input_samples = (MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL +
                                         falcon_dsp_polyphase_resampler<T, C>::m_coeffs_per_phase + 1);
         
+        std::cout << "Maximum input samples: " << m_max_num_cuda_input_samples << std::endl;
+        
         m_max_num_cuda_output_samples = falcon_dsp_polyphase_resampler<T, C>::needed_out_count(MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL);
         
         cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(T));
@@ -152,7 +155,7 @@ namespace falcon_dsp
         }
     }
 
-    /* CUDA kernel function that adds the elements of two arrays */
+    /* CUDA kernel function that resamples the input array */
     __global__
     void _polyphase_resampler_cuda(cuFloatComplex * in, uint32_t in_len, cuFloatComplex * out, uint32_t out_len,
                                    cuFloatComplex * coeffs, uint32_t coeffs_len, uint32_t coeffs_per_phase,
@@ -187,7 +190,7 @@ namespace falcon_dsp
         out[thread_index] = acc;
     }
     
-    /* generic implementation */
+    /* specialized implementation */
     template<>
     int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<input_type>& in, std::vector<output_type>& out)
     {
@@ -259,13 +262,14 @@ namespace falcon_dsp
                 /* copy input samples into CUDA memory. note that this includes both the previous
                  *  samples required for filtering NUM_INPUT_SAMPLES_PER_CUDA_KERNEL (one for
                  *  each kernel thread) */
-                for (uint32_t ii = 0; ii < num_samples + falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_coeffs_per_phase + 1; ++ii)
+                for (uint32_t ii = 0;
+                     ii < num_samples + falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_coeffs_per_phase + 1;
+                     ++ii)
                 {
                     cuda_input_data[ii] = *(static_cast<cuFloatComplex *>(
                                               static_cast<void *>(&in[x_back_idx + ii])));
                 }
                 
-                /* TODO invoke the CUDA kernel */
                 uint32_t num_thread_blocks = 1;
                 _polyphase_resampler_cuda<<<num_thread_blocks, num_threads>>>(
                         cuda_input_data,

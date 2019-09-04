@@ -67,15 +67,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * @file     falcon_dsp_polyphase_resampler.h
  * @author   OrthogonalHawk
- * @date     21-Apr-2019
+ * @date     03-Sep-2019
  *
  * @brief    Polyphase resampler interface that supports arbitrary input and output
- *            sample rates; C++ and CUDA versions.
+ *            sample rates; CUDA version.
  *
  * @section  DESCRIPTION
  *
  * Polyphase resampler interface that supports arbitrary input and output sample
- *  rates. Includes C++ implementation.
+ *  rates. Includes CUDA implementations.
  *
  * Notes from https://github.com/staticfloat/upfirdn/blob/master/README.txt
  *
@@ -103,12 +103,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * @section  HISTORY
  *
- * 21-Apr-2019  OrthogonalHawk  File created.
+ * 03-Sep-2019  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_POLYPHASE_RESAMPLER_H__
-#define __FALCON_DSP_POLYPHASE_RESAMPLER_H__
+#ifndef __FALCON_DSP_POLYPHASE_RESAMPLER_CUDA_H__
+#define __FALCON_DSP_POLYPHASE_RESAMPLER_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
@@ -117,6 +117,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <complex>
 #include <mutex>
 #include <vector>
+
+#include "resample/falcon_dsp_polyphase_resampler.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -135,53 +137,47 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 namespace falcon_dsp
-{
-    /* @brief C++ implementation of a polyphase resampler
+{    
+    /* @brief CUDA implementation of a polyphase resampler
+     * @description Derives from the C++ version since there is significant overlap
+     *               in implementation. CUDA vs. C++ differentiation in the 'apply'
+     *               method when the resampling is performed.
      */
     template<class T, class C>
-    class falcon_dsp_polyphase_resampler
+    class falcon_dsp_polyphase_resampler_cuda : public falcon_dsp_polyphase_resampler<T, C>
     {
     public:
-    
+        
         typedef    T input_type;
         typedef    T output_type;
         typedef    C coeff_type;
-
-        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
-        virtual ~falcon_dsp_polyphase_resampler(void);
-
-        falcon_dsp_polyphase_resampler(void) = delete;
-        falcon_dsp_polyphase_resampler(const falcon_dsp_polyphase_resampler&) = delete;
-
-        void reset_state(void);
-        virtual int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out);
-        uint32_t        needed_out_count(uint32_t inCount);
-        uint32_t        coeffs_per_phase() { return m_coeffs_per_phase; }
-
-    protected:
-    
-        std::mutex m_mutex;
-        uint32_t   m_up_rate;
-        uint32_t   m_down_rate;
-
-        std::vector<coeff_type>     m_transposed_coeffs;
-        std::vector<input_type>     m_state;
         
-        uint32_t                    m_padded_coeff_count;  // ceil(len(coefs)/upRate)*upRate
-        uint32_t                    m_coeffs_per_phase;    // _paddedCoefCount / upRate
-
-        uint32_t                    m_t;                   // "time" (modulo upRate)
-        uint32_t                    m_xOffset;
+        falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
+        ~falcon_dsp_polyphase_resampler_cuda(void);
+        
+        int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out) override;
+    
+    private:
+        
+        bool compute_next_kernel_params(int64_t cur_x_idx, size_t in_size,
+                                        uint32_t& num_in_samples, uint32_t& num_threads, uint32_t& new_t);
+        
+        /* variables for CUDA memory management */
+        void * m_cuda_input_samples;
+        void * m_cuda_output_samples;
+        void * m_cuda_filter_coeffs;
+        
+        uint32_t m_max_num_cuda_input_samples;
+        uint32_t m_max_num_cuda_output_samples;
     };
     
-    /* specific implementation(s) of this template class; customized for these specific
-     *  templated variable types */
-    template<>
-    int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+    /* specific implementation of this template class */
+    template <>
+    int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
 
 /******************************************************************************
  *                            CLASS DECLARATION
  *****************************************************************************/
 
-#endif // __FALCON_DSP_POLYPHASE_RESAMPLER_H__
+#endif // __FALCON_DSP_POLYPHASE_RESAMPLER_CUDA_H__
