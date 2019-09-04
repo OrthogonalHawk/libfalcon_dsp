@@ -85,6 +85,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <iostream>
 #include <stdint.h>
 
 #include "falcon_dsp_polyphase_resampler.h"
@@ -134,8 +135,10 @@ namespace falcon_dsp
         std::fill(m_transposed_coeffs.begin(), m_transposed_coeffs.end(), 0.);
 
         m_state.clear();
-        m_state.reserve(m_coeffs_per_phase);
-        std::fill(m_state.begin(), m_state.end(), 0.);
+        for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)
+        {
+            m_state.push_back(C(0.0, 0.0));
+        }
 
         /* This both transposes, and "flips" each phase, while
          * copying the defined coefficients into local storage.
@@ -164,11 +167,15 @@ namespace falcon_dsp
     template<class T, class C>
     void falcon_dsp_polyphase_resampler<T, C>::reset_state(void)
     {
-        std::lock_guard<std::mutex> locak(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         
         /* reset the state information; an end-user might invoke this function if processing
          *  non-continuous data */
-        std::fill(m_state.begin(), m_state.end(), 0.);
+        m_state.clear();
+        for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)
+        {
+            m_state.push_back(C(0.0, 0.0));
+        }
         m_t = 0;
         m_xOffset = 0;
     }
@@ -212,16 +219,20 @@ namespace falcon_dsp
             {
                 /* need to draw from the state buffer */
                 typename std::vector<input_type>::iterator state_iter = m_state.end() - offset;
-                while (state_iter < m_state.end())
+                while (state_iter != m_state.end())
                 {
-                    acc += *(state_iter++) * *(coeff_iter++);
+                    acc += (*state_iter) * (*coeff_iter);
+                    state_iter++;
+                    coeff_iter++;
                 }
                 x_back_idx += offset;
             }
             
             while (x_back_idx <= x_idx)
             {
-                acc += in[x_back_idx++] * *(coeff_iter++);
+                acc += in[x_back_idx] * *(coeff_iter);
+                x_back_idx++;
+                coeff_iter++;
             }
             
             out.push_back(acc);
@@ -277,7 +288,7 @@ namespace falcon_dsp
         int64_t x_idx = m_xOffset;
         while (static_cast<uint64_t>(x_idx) < in.size())
         {
-            std::complex<float> acc = std::complex<float>(0);
+            std::complex<float> acc = std::complex<float>(0.0, 0.0);
             std::vector<std::complex<float>>::iterator coeff_iter = m_transposed_coeffs.begin() + m_t * m_coeffs_per_phase;
             
             /* need to look back over the previous samples to compute the
@@ -289,7 +300,7 @@ namespace falcon_dsp
             {
                 /* need to draw from the state buffer */
                 std::vector<std::complex<float>>::iterator state_iter = m_state.end() - offset;
-                while (state_iter < m_state.end())
+                while (state_iter != m_state.end())
                 {
                     /* by assuming that the filter coefficients are only real (symmetric filter) we can
                      *  bypass multiplication by the imaginary filter coefficients, which will be 0 */

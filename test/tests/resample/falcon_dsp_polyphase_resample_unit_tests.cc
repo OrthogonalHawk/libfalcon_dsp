@@ -135,10 +135,10 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
     std::chrono::duration<double, std::milli> duration_ms = done - start;
     
     std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
-    
+    std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     EXPECT_TRUE(filter_delay < expected_out_data.size());
-    EXPECT_TRUE((expected_out_data.size() - filter_delay) >= out_data.size());
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 2));
+    EXPECT_TRUE(expected_out_data.size() >= out_data.size());
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
     
     for (uint32_t ii = filter_delay; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {   
@@ -154,12 +154,12 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
             max_imag_diff = 10;
         }
 
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
+        EXPECT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
+        EXPECT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
     }
 }
 
-TEST(falcon_dsp_transform, cpp_resample_004)
+TEST(falcon_dsp_resample, cpp_resample_004)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_004_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_004.filter_coeffs.txt";
@@ -173,7 +173,7 @@ TEST(falcon_dsp_transform, cpp_resample_004)
                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_transform, cpp_resample_005)
+TEST(falcon_dsp_resample, cpp_resample_005)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_005_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_005.filter_coeffs.txt";
@@ -182,6 +182,48 @@ TEST(falcon_dsp_transform, cpp_resample_005)
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 6e5;
+    
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+}
+
+TEST(falcon_dsp_resample, cpp_resample_006)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_006_x.bin";
+    std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_006.filter_coeffs.txt";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_006_y.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 2e6;
+    
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+}
+
+TEST(falcon_dsp_resample, cpp_resample_007)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_007_x.bin";
+    std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_007.filter_coeffs.txt";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_007_y.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 800e3;
+    
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+}
+
+TEST(falcon_dsp_resample, cpp_resample_008)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_008_x.bin";
+    std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_008.filter_coeffs.txt";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_008_y.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 450e3;
     
     run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);

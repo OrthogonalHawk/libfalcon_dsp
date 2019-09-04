@@ -68,4 +68,37 @@ export RAMP_OUTPUT=0
 
 jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_005.ipynb
 
+
+# 006 - no frequency shift; 1 MHz -> 2 MHz
+export FREQ_SHIFT=0
+export INPUT_SAMPLE_RATE=1000000
+export OUTPUT_SAMPLE_RATE=2000000
+export NUM_OUTPUT_SAMPLES=10000
+export OUT_FILE_NAME=../vectors/test_006
+export RAMP_OUTPUT=0
+
+jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_006.ipynb
+
+
+# 007 - no frequency shift; 1 MHz -> 800 kHz
+export FREQ_SHIFT=0
+export INPUT_SAMPLE_RATE=1000000
+export OUTPUT_SAMPLE_RATE=800000
+export NUM_OUTPUT_SAMPLES=10000
+export OUT_FILE_NAME=../vectors/test_007
+export RAMP_OUTPUT=0
+
+jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_007.ipynb
+
+
+# 008 - no frequency shift; 1 MHz -> 450 kHz
+export FREQ_SHIFT=0
+export INPUT_SAMPLE_RATE=1000000
+export OUTPUT_SAMPLE_RATE=450000
+export NUM_OUTPUT_SAMPLES=10000
+export OUT_FILE_NAME=../vectors/test_008
+export RAMP_OUTPUT=0
+
+jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_008.ipynb
+
 cd ../
