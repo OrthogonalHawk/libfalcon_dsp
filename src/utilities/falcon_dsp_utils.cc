@@ -75,6 +75,33 @@
 
 namespace falcon_dsp
 {
+    /* @brief Computes filter delay in terms of samples
+     * @description Computes the filter delay in samples based on the provided
+     *               filter coefficients and resampling ratio.
+     * @param[in]  coeffs                   - filter coefficients
+     * @param[in]  in_sample_rate_in_sps    - input data sample rate in samples per second
+     * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
+     * @return Filter delay  in samples
+     */
+    uint32_t calculate_filter_delay(std::vector<std::complex<float>> &coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps)
+    {
+        /* compute the required up and down sample rates */
+        int64_t up_rate, down_rate;
+        double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
+        rat_approx(decimal, 1024, up_rate, down_rate);
+
+        int64_t divisor = up_rate;
+        if (out_sample_rate_in_sps > in_sample_rate_in_sps)
+        {
+            divisor = down_rate;
+        }
+        
+        std::cout << "up: " << up_rate << " down: " << down_rate << std::endl;
+        std::cout << "max: " << std::max(up_rate, down_rate) << std::endl;
+        
+        return coeffs.size() / divisor / 2;
+    }
+
     /* @brief Computes the greatest common denominator between two numbers
      * @param[in] a - first value to consider
      * @param[in] b - second value to consider
@@ -456,7 +483,7 @@ namespace falcon_dsp
         
         if (type == file_type_e::BINARY)
         {
-            /* currently not supported */
+            std::cerr << "Reading BINARY files and returning complex floats is currently not supported" << std::endl;
             ret = false;
         }
         else if (type == file_type_e::ASCII)
@@ -465,6 +492,7 @@ namespace falcon_dsp
             std::ifstream input_file(file_name, std::ios::in);
             if (!input_file.is_open())
             {
+                std::cerr << "Unable to open file " << file_name << std::endl;
                 return false;
             }
 
@@ -477,6 +505,7 @@ namespace falcon_dsp
         }
         else
         {
+            std::cerr << "Unsupported file type " << static_cast<uint32_t>(type) << std::endl;
             ret = false;
         }
         

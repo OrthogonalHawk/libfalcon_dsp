@@ -49,6 +49,7 @@ LIB = lib/libfalcon_dsp$(LIB_SUFFIX).a
 CC_SOURCES = \
     src/math/falcon_dsp_add.cc \
     src/resample/falcon_dsp_polyphase_resampler.cc \
+    src/resample/falcon_dsp_resample.cc \
     src/transform/falcon_dsp_freq_shift.cc \
     src/utilities/falcon_dsp_utils.cc \
     
