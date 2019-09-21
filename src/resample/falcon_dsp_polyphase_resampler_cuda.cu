@@ -123,8 +123,6 @@ namespace falcon_dsp
         m_max_num_cuda_input_samples = (MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL +
                                         falcon_dsp_polyphase_resampler<T, C>::m_coeffs_per_phase + 1);
         
-        std::cout << "Maximum input samples: " << m_max_num_cuda_input_samples << std::endl;
-        
         m_max_num_cuda_output_samples = falcon_dsp_polyphase_resampler<T, C>::needed_out_count(MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL);
         
         cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(T));
@@ -206,9 +204,6 @@ namespace falcon_dsp
                    m_transposed_coeffs.size() * sizeof(std::complex<float>),
                    cudaMemcpyHostToDevice );
         
-        std::cout << "Copied " << m_transposed_coeffs.size()
-                  << " filter coefficients to CUDA memory" << std::endl;
-        
         cuFloatComplex * cuda_filter_coeffs = static_cast<cuFloatComplex *>(m_cuda_filter_coeffs);
         cuFloatComplex * cuda_input_data = static_cast<cuFloatComplex *>(m_cuda_input_samples);
         cuFloatComplex * cuda_output_data = static_cast<cuFloatComplex *>(m_cuda_output_samples);
@@ -224,8 +219,6 @@ namespace falcon_dsp
         }
         uint32_t cur_out_idx = 0;
         
-        std::cout << "Reserved space for " << out.size() << " output samples" << std::endl;
-        
         /* don't bother with running a CUDA/GPU implementation if the input size is not
          *  larger than the state vector */
         if (in.size() <= falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.size())
@@ -233,8 +226,6 @@ namespace falcon_dsp
             return falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(in, out);  
         }
         
-        std::cout << "Copying " << in.size() << " samples into CUDA memory" << std::endl;
-                
         /* copy all input samples into CUDA memory */
         for (uint32_t in_data_idx = 0; in_data_idx < in.size(); ++in_data_idx)
         {

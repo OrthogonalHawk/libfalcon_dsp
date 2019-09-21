@@ -131,7 +131,6 @@ namespace falcon_dsp
         
         falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>> resampler(up_rate, down_rate, filter_coeffs);
         
-        std::cout << "created resampler" << std::endl;
         return resampler.apply(in, out) > 0;
     }
     
