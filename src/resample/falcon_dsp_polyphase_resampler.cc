@@ -132,7 +132,10 @@ namespace falcon_dsp
     
         m_transposed_coeffs.clear();
         m_transposed_coeffs.reserve(m_padded_coeff_count);
-        std::fill(m_transposed_coeffs.begin(), m_transposed_coeffs.end(), 0.);
+        for (uint32_t ii = 0; ii < m_padded_coeff_count; ++ii)
+        {
+            m_transposed_coeffs.push_back(0);
+        }
 
         m_state.clear();
         for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)

@@ -153,8 +153,9 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
             max_imag_diff = 10;
         }
 
-        EXPECT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
-        EXPECT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
+        //std::cout << "ii=" << ii << std::endl;
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
     }
 }
 

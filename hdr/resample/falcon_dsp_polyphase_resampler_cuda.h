@@ -159,8 +159,10 @@ namespace falcon_dsp
     
     private:
         
-        bool compute_next_kernel_params(int64_t cur_x_idx, size_t in_size,
-                                        uint32_t& num_in_samples, uint32_t& num_threads, uint32_t& new_t);
+        bool compute_kernel_params(int64_t cur_x_idx, size_t in_size,
+                                   uint32_t& num_out_samples,
+                                   uint32_t& new_t,
+                                   int64_t& final_x_idx);
         
         /* variables for CUDA memory management */
         void * m_cuda_input_samples;
