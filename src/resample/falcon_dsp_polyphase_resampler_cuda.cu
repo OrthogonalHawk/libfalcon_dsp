@@ -96,6 +96,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 const uint32_t MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL = 16384 * 16;
+const uint32_t MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK = 256;
+
+const uint32_t NUM_OUTPUTS_PER_CUDA_THREAD = 1;
 const uint32_t MAX_NUM_CUDA_THREADS = 256;
 
 /******************************************************************************
@@ -164,9 +167,19 @@ namespace falcon_dsp
                                    uint32_t up_rate,
                                    uint32_t down_rate)
     {
+        __shared__ cuFloatComplex s_coeffs[MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK];
+
         /* compute the thread index */
         uint32_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+
+        /* copy coefficients to shared memory */
+        if (threadIdx.x < coeffs_len)
+        {
+            s_coeffs[threadIdx.x] = coeffs[threadIdx.x];
+        }
         
+        __syncthreads();
+
         /* compute local thread variables */
         int64_t thread_x_idx = start_x_idx;
         uint32_t thread_t = start_t;
@@ -181,7 +194,7 @@ namespace falcon_dsp
         
         /* apply the polyphase filter */
         cuFloatComplex acc = make_cuFloatComplex(0, 0);
-        cuFloatComplex * coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+        cuFloatComplex * coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
         for (int64_t x_idx = (thread_x_idx - coeffs_per_phase + 1);
              x_idx < thread_x_idx;
              ++x_idx, ++coeff_ptr)
@@ -246,7 +259,7 @@ namespace falcon_dsp
             
             /* need to look back over the previous samples to compute the
              *  current filtered value */
-            int64_t x_back_idx = x_idx - falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_coeffs_per_phase + 1;
+            int64_t x_back_idx = x_idx - m_coeffs_per_phase + 1;
             int64_t offset = 0 - x_back_idx;
             
             /* values toward the beginning of the vector may require samples
@@ -270,13 +283,19 @@ namespace falcon_dsp
             uint32_t num_out_samples, new_t;
             int64_t new_x_idx;
             if (!required_state_array &&
-                compute_kernel_params(x_idx, in.size(), num_out_samples, new_t, new_x_idx))
-            {              
+                compute_kernel_params(x_idx, in.size(), num_out_samples, new_t, new_x_idx) &&
+                m_transposed_coeffs.size() < MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK)
+            {
                 uint32_t num_thread_blocks = num_out_samples / MAX_NUM_CUDA_THREADS;
                 if (num_out_samples % MAX_NUM_CUDA_THREADS != 0)
                 {
                     num_thread_blocks++;
                 }
+
+                /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+                 *  can better handle complex<float> data, which is natively 8 bytes in size */
+                cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+
                 _polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                         cuda_input_data,
                         m_max_num_cuda_input_samples,
@@ -356,21 +375,21 @@ namespace falcon_dsp
                                                                           size_t in_size,
                                                                           uint32_t& num_out_samples,
                                                                           uint32_t& new_t,
-                                                                          int64_t &final_x_idx)
+                                                                          int64_t&  new_x_idx)
     {
         uint32_t local_t = falcon_dsp_polyphase_resampler<T, C>::m_t;
-        final_x_idx = cur_x_idx;
+        new_x_idx = cur_x_idx;
 
         num_out_samples = 0;
         new_t = local_t;
         
         bool reached_limit = false;
-        while (!reached_limit && final_x_idx < in_size)
+        while (!reached_limit && new_x_idx < in_size)
         {
             /* compute the next 'cycle' updates */
             local_t += falcon_dsp_polyphase_resampler<T, C>::m_down_rate;
             int64_t advance_amount = local_t / falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
-            final_x_idx += advance_amount;
+            new_x_idx += advance_amount;
             local_t %= falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
             
             /* increment trackers; assuming one output sample per thread */
