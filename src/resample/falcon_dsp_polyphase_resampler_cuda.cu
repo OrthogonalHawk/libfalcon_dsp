@@ -180,12 +180,13 @@ namespace falcon_dsp
         }
         
         /* apply the polyphase filter */
-        cuFloatComplex acc; acc.x = 0; acc.y = 0;
+        cuFloatComplex acc = make_cuFloatComplex(0, 0);
         cuFloatComplex * coeff_ptr = coeffs + thread_t * coeffs_per_phase;
-        int64_t x_back_idx = thread_x_idx - coeffs_per_phase + 1;
-        while (x_back_idx <= thread_x_idx)
+        for (int64_t x_idx = (thread_x_idx - coeffs_per_phase + 1);
+             x_idx < thread_x_idx;
+             ++x_idx, ++coeff_ptr)
         {
-            acc = cuCaddf(acc, cuCmulf(in[x_back_idx++], *(coeff_ptr++)));
+            acc = cuCaddf(acc, cuCmulf(in[x_idx], *(coeff_ptr)));
         }
         
         /* set the output variable */
