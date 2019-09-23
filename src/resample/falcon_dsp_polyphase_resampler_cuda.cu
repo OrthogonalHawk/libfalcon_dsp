@@ -105,6 +105,15 @@ const uint32_t MAX_NUM_CUDA_THREADS = 256;
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
 
+struct output_sample_s
+{
+    bool             active;
+    cuFloatComplex   acc;
+    cuFloatComplex * coeff_ptr;
+    int64_t          data_start_idx;
+    int64_t          data_stop_idx;
+};
+        
 /******************************************************************************
  *                                  MACROS
  *****************************************************************************/
@@ -168,6 +177,16 @@ namespace falcon_dsp
                                    uint32_t down_rate)
     {
         __shared__ cuFloatComplex s_coeffs[MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK];
+        output_sample_s out_samples[NUM_OUTPUTS_PER_CUDA_THREAD];
+
+        /* initialize the output sample data structures */
+        for (uint32_t ii = 0; ii < NUM_OUTPUTS_PER_CUDA_THREAD; ++ii)
+        {
+            out_samples[ii].active = false;
+            out_samples[ii].coeff_ptr = nullptr;
+            out_samples[ii].data_start_idx = LONG_MAX;
+            out_samples[ii].data_stop_idx = LONG_MAX;
+        }
 
         /* compute the thread index */
         uint32_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -177,33 +196,81 @@ namespace falcon_dsp
         {
             s_coeffs[threadIdx.x] = coeffs[threadIdx.x];
         }
-        
         __syncthreads();
 
         /* compute local thread variables */
         int64_t thread_x_idx = start_x_idx;
         uint32_t thread_t = start_t;
         
-        for (uint32_t ii = 0; ii < thread_index; ++ii)
+        int64_t thread_start_output_sample_idx = thread_index * NUM_OUTPUTS_PER_CUDA_THREAD;
+        for (int64_t out_sample_idx = 0;
+             out_sample_idx < thread_start_output_sample_idx;
+             ++out_sample_idx)
         {
-            /* compute the next 'cycle' updates */
+            /* compute the next output sample 'cycle' updates */
             thread_t += down_rate;
             thread_x_idx += thread_t / up_rate;
             thread_t %= up_rate;
         }
         
-        /* apply the polyphase filter */
-        cuFloatComplex acc = make_cuFloatComplex(0, 0);
-        cuFloatComplex * coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
-        for (int64_t x_idx = (thread_x_idx - coeffs_per_phase + 1);
-             x_idx < thread_x_idx;
-             ++x_idx, ++coeff_ptr)
+        /* capture the FIRST output sample information */
+        out_samples[0].active = true;
+        out_samples[0].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
+        out_samples[0].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
+        out_samples[0].data_stop_idx = thread_x_idx;
+
+        int64_t thread_data_start_idx = out_samples[0].data_start_idx;
+        int64_t thread_data_stop_idx =  out_samples[0].data_stop_idx;
+        
+        for (uint32_t out_sample_idx = 1; out_sample_idx < NUM_OUTPUTS_PER_CUDA_THREAD; ++out_sample_idx)
         {
-            acc = cuCaddf(acc, cuCmulf(in[x_idx], *(coeff_ptr)));
+            /* compute the next output sample 'cycle' updates */
+            thread_t += down_rate;
+            thread_x_idx += thread_t / up_rate;
+            thread_t %= up_rate;
+            
+            out_samples[out_sample_idx].active = true;
+            out_samples[out_sample_idx].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
+            out_samples[out_sample_idx].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
+            out_samples[out_sample_idx].data_stop_idx = thread_x_idx;
+            
+            thread_data_stop_idx = out_samples[out_sample_idx].data_stop_idx;
+        }
+        
+        uint32_t first_active_out_sample = 0;
+        cuFloatComplex next_x_val;
+        for (int64_t x_idx = thread_data_start_idx; x_idx < thread_data_stop_idx; ++x_idx)
+        {
+            next_x_val = in[x_idx];
+            for (uint32_t thread_out_sample_idx = first_active_out_sample;
+                 thread_out_sample_idx < NUM_OUTPUTS_PER_CUDA_THREAD;
+                 ++thread_out_sample_idx)
+            {               
+                /* we don't need to check whether x_idx is less than data_stop_idx
+                 *  here because it's checked later and once x_idx is >= data_stop_idx
+                 *  this output is 'disabled' and will no longer be assessed */
+                if (x_idx >= out_samples[thread_out_sample_idx].data_start_idx)
+                {                   
+                    out_samples[thread_out_sample_idx].acc = cuCaddf(out_samples[thread_out_sample_idx].acc,
+                                                                     cuCmulf(next_x_val, *(out_samples[thread_out_sample_idx].coeff_ptr++)));
+                                                              
+                    if ((out_samples[thread_out_sample_idx].data_stop_idx - 1) <= x_idx)
+                    {
+                        /* finished computing acc for this output */
+                        first_active_out_sample++;
+                    }
+                }
+            }
         }
         
         /* set the output variable */
-        out[thread_index] = acc;
+        for (uint32_t ii = 0;
+             ii < NUM_OUTPUTS_PER_CUDA_THREAD && out_samples[ii].active;
+             ++ii)
+        {
+            uint64_t global_output_sample_idx = thread_index * NUM_OUTPUTS_PER_CUDA_THREAD + ii;
+            out[global_output_sample_idx] = out_samples[ii].acc;
+        }
     }
     
     /* specialized implementation */
@@ -286,11 +353,14 @@ namespace falcon_dsp
                 compute_kernel_params(x_idx, in.size(), num_out_samples, new_t, new_x_idx) &&
                 m_transposed_coeffs.size() < MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK)
             {
-                uint32_t num_thread_blocks = num_out_samples / MAX_NUM_CUDA_THREADS;
-                if (num_out_samples % MAX_NUM_CUDA_THREADS != 0)
+                uint32_t num_thread_blocks = num_out_samples / (MAX_NUM_CUDA_THREADS * NUM_OUTPUTS_PER_CUDA_THREAD);
+                if (num_out_samples % (MAX_NUM_CUDA_THREADS * NUM_OUTPUTS_PER_CUDA_THREAD) != 0)
                 {
                     num_thread_blocks++;
                 }
+                
+                printf("Num required thread blocks: %u for %u out samples\n",
+                    num_thread_blocks, num_out_samples);
 
                 /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
                  *  can better handle complex<float> data, which is natively 8 bytes in size */
