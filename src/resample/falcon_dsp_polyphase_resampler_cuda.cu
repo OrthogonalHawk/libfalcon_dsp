@@ -87,9 +87,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <iostream>
 #include <cuComplex.h>
+#include <numeric>
 #include <stdint.h>
 
 #include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -98,7 +100,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 const uint32_t MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL = 16384 * 16;
 const uint32_t MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK = 256;
 
-const uint32_t NUM_OUTPUTS_PER_CUDA_THREAD = 1;
+const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 32;
 const uint32_t MAX_NUM_CUDA_THREADS = 256;
 
 /******************************************************************************
@@ -139,6 +141,23 @@ namespace falcon_dsp
         
         cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(T));
         cudaMallocManaged(&m_cuda_output_samples, m_max_num_cuda_output_samples * sizeof(T));
+
+        /* calculate the average number of samples that are advanced for
+         *  each output sample */
+        m_avg_advance_per_output_sample = get_average_advance_in_samples();
+
+        /* calculate the optimal number of outputs per CUDA thread. this value
+         *  is chosen to minimize the number of repeated requests for the same
+         *  input data from global memory and to prevent memory buffer collisions
+         *  between CUDA threads in the same warp */
+        m_num_outputs_per_cuda_thread = static_cast<uint32_t>(
+                                            std::ceil(static_cast<float>(falcon_dsp::calculate_filter_delay(filter_coeffs.size(), up_rate, down_rate)) / 
+                                                      static_cast<float>(falcon_dsp_polyphase_resampler_cuda<T, C>::m_avg_advance_per_output_sample)));
+
+        if (m_num_outputs_per_cuda_thread > MAX_NUM_OUTPUTS_PER_CUDA_THREAD)
+        {
+            m_num_outputs_per_cuda_thread = MAX_NUM_OUTPUTS_PER_CUDA_THREAD;
+        }
     }
     
     template<class T, class C>
@@ -171,21 +190,26 @@ namespace falcon_dsp
                                    cuFloatComplex * out, uint32_t out_len,
                                    cuFloatComplex * coeffs, uint32_t coeffs_len,
                                    uint32_t coeffs_per_phase,
+                                   uint32_t num_outputs_per_cuda_thread,
                                    int64_t start_x_idx,
                                    uint32_t start_t,
                                    uint32_t up_rate,
                                    uint32_t down_rate)
     {
         __shared__ cuFloatComplex s_coeffs[MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK];
-        output_sample_s out_samples[NUM_OUTPUTS_PER_CUDA_THREAD];
+        output_sample_s out_samples[MAX_NUM_OUTPUTS_PER_CUDA_THREAD];
 
         /* initialize the output sample data structures */
-        for (uint32_t ii = 0; ii < NUM_OUTPUTS_PER_CUDA_THREAD; ++ii)
+        for (uint32_t ii = 0;
+             ii < num_outputs_per_cuda_thread && ii < MAX_NUM_OUTPUTS_PER_CUDA_THREAD;
+             ++ii)
         {
             out_samples[ii].active = false;
             out_samples[ii].coeff_ptr = nullptr;
             out_samples[ii].data_start_idx = LONG_MAX;
             out_samples[ii].data_stop_idx = LONG_MAX;
+            out_samples[ii].acc.x = 0;
+            out_samples[ii].acc.y = 0;
         }
 
         /* compute the thread index */
@@ -202,7 +226,7 @@ namespace falcon_dsp
         int64_t thread_x_idx = start_x_idx;
         uint32_t thread_t = start_t;
         
-        int64_t thread_start_output_sample_idx = thread_index * NUM_OUTPUTS_PER_CUDA_THREAD;
+        int64_t thread_start_output_sample_idx = thread_index * num_outputs_per_cuda_thread;
         for (int64_t out_sample_idx = 0;
              out_sample_idx < thread_start_output_sample_idx;
              ++out_sample_idx)
@@ -222,7 +246,7 @@ namespace falcon_dsp
         int64_t thread_data_start_idx = out_samples[0].data_start_idx;
         int64_t thread_data_stop_idx =  out_samples[0].data_stop_idx;
         
-        for (uint32_t out_sample_idx = 1; out_sample_idx < NUM_OUTPUTS_PER_CUDA_THREAD; ++out_sample_idx)
+        for (uint32_t out_sample_idx = 1; out_sample_idx < num_outputs_per_cuda_thread; ++out_sample_idx)
         {
             /* compute the next output sample 'cycle' updates */
             thread_t += down_rate;
@@ -243,7 +267,7 @@ namespace falcon_dsp
         {
             next_x_val = in[x_idx];
             for (uint32_t thread_out_sample_idx = first_active_out_sample;
-                 thread_out_sample_idx < NUM_OUTPUTS_PER_CUDA_THREAD;
+                 thread_out_sample_idx < num_outputs_per_cuda_thread;
                  ++thread_out_sample_idx)
             {               
                 /* we don't need to check whether x_idx is less than data_stop_idx
@@ -260,16 +284,20 @@ namespace falcon_dsp
                         first_active_out_sample++;
                     }
                 }
+                else
+                {
+                    break;
+                }
             }
         }
         
         /* set the output variable */
+        uint64_t global_output_sample_idx_base = thread_index * num_outputs_per_cuda_thread;
         for (uint32_t ii = 0;
-             ii < NUM_OUTPUTS_PER_CUDA_THREAD && out_samples[ii].active;
+             ii < num_outputs_per_cuda_thread && out_samples[ii].active;
              ++ii)
         {
-            uint64_t global_output_sample_idx = thread_index * NUM_OUTPUTS_PER_CUDA_THREAD + ii;
-            out[global_output_sample_idx] = out_samples[ii].acc;
+            out[global_output_sample_idx_base + ii] = out_samples[ii].acc;
         }
     }
     
@@ -353,8 +381,8 @@ namespace falcon_dsp
                 compute_kernel_params(x_idx, in.size(), num_out_samples, new_t, new_x_idx) &&
                 m_transposed_coeffs.size() < MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK)
             {
-                uint32_t num_thread_blocks = num_out_samples / (MAX_NUM_CUDA_THREADS * NUM_OUTPUTS_PER_CUDA_THREAD);
-                if (num_out_samples % (MAX_NUM_CUDA_THREADS * NUM_OUTPUTS_PER_CUDA_THREAD) != 0)
+                uint32_t num_thread_blocks = num_out_samples / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
+                if (num_out_samples % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
                 {
                     num_thread_blocks++;
                 }
@@ -374,6 +402,7 @@ namespace falcon_dsp
                         cuda_filter_coeffs,
                         m_transposed_coeffs.size(),
                         m_coeffs_per_phase,
+                        m_num_outputs_per_cuda_thread,
                         x_idx, /* x_start_idx */
                         m_t,
                         m_up_rate,
@@ -470,6 +499,33 @@ namespace falcon_dsp
         return (num_out_samples > 0);
     }
     
+    template<class T, class C>
+    uint32_t falcon_dsp_polyphase_resampler_cuda<T, C>::get_average_advance_in_samples(void)
+    {
+        const uint32_t NUM_SAMPLES_TO_EVALUATE = 1e6;
+
+        uint32_t local_t = falcon_dsp_polyphase_resampler<T, C>::m_t;
+        int64_t  local_x_idx = 0;
+        std::vector<uint32_t> local_advances;
+
+        bool reached_limit = false;
+        while (!reached_limit && local_x_idx < NUM_SAMPLES_TO_EVALUATE)
+        {
+            /* compute the next 'cycle' updates */
+            local_t += falcon_dsp_polyphase_resampler<T, C>::m_down_rate;
+            int64_t advance_amount = local_t / falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
+            local_t %= falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
+            local_x_idx += advance_amount;
+
+            local_advances.push_back(advance_amount);
+        }
+
+        float accum_sum = static_cast<float>(std::accumulate(local_advances.begin(), local_advances.end(), 0));
+        float advance_avg = accum_sum / static_cast<float>(local_advances.size());
+
+        return static_cast<uint32_t>(std::ceil(advance_avg));
+    }
+
     /* force instantiation for specific types */
     template class falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>;
 }

@@ -163,14 +163,18 @@ namespace falcon_dsp
                                    uint32_t& num_out_samples,
                                    uint32_t& new_t,
                                    int64_t&  new_x_idx);
-        
+
+        uint32_t get_average_advance_in_samples(void);
+
         /* variables for CUDA memory management */
         void * m_cuda_input_samples;
         void * m_cuda_output_samples;
         void * m_cuda_filter_coeffs;
-        
+
         uint32_t m_max_num_cuda_input_samples;
         uint32_t m_max_num_cuda_output_samples;
+        uint32_t m_avg_advance_per_output_sample;
+        uint32_t m_num_outputs_per_cuda_thread;
     };
     
     /* specific implementation of this template class */
