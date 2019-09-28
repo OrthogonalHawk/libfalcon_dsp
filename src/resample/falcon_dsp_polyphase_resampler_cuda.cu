@@ -197,6 +197,7 @@ namespace falcon_dsp
                                    uint32_t num_outputs_per_cuda_thread,
                                    int64_t start_x_idx,
                                    uint32_t start_t,
+                                   uint32_t start_output_idx,
                                    uint32_t up_rate,
                                    uint32_t down_rate)
     {
@@ -230,7 +231,7 @@ namespace falcon_dsp
         int64_t thread_x_idx = start_x_idx;
         uint32_t thread_t = start_t;
         
-        int64_t thread_start_output_sample_idx = thread_index * num_outputs_per_cuda_thread;
+        int64_t thread_start_output_sample_idx = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
         
         /* verify that this thread has at least one output to compute */
         if (thread_start_output_sample_idx >= out_len)
@@ -238,7 +239,7 @@ namespace falcon_dsp
             return;
         }
         
-        for (int64_t out_sample_idx = 0;
+        for (int64_t out_sample_idx = start_output_idx;
              out_sample_idx < thread_start_output_sample_idx;
              ++out_sample_idx)
         {
@@ -307,13 +308,13 @@ namespace falcon_dsp
             }
         }
         
-        /* set the output variable */
-        uint64_t global_output_sample_idx_base = thread_index * num_outputs_per_cuda_thread;
-        for (uint32_t ii = 0;
-             ii < num_outputs_per_cuda_thread && out_samples[ii].active;
-             ++ii)
+        /* set the global outputs */
+        uint64_t global_output_sample_idx_base = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
+        for (uint32_t out_sample_idx = 0;
+             out_sample_idx < num_outputs_per_cuda_thread && out_samples[out_sample_idx].active;
+             ++out_sample_idx)
         {
-            out[global_output_sample_idx_base + ii] = out_samples[ii].acc;
+            out[global_output_sample_idx_base + out_sample_idx] = out_samples[out_sample_idx].acc;
         }
     }
     
@@ -416,6 +417,7 @@ namespace falcon_dsp
                         m_num_outputs_per_cuda_thread,
                         x_idx, /* x_start_idx */
                         m_t,
+                        cur_out_idx,
                         m_up_rate,
                         m_down_rate);
 
@@ -431,7 +433,7 @@ namespace falcon_dsp
                 
                 /* copy output samples out of CUDA memory */
                 cudaMemcpy(out.data() + cur_out_idx,
-                           cuda_output_data,
+                           cuda_output_data + cur_out_idx,
                            num_outputs_from_thread_blocks * sizeof(std::complex<float>),
                            cudaMemcpyDeviceToHost);
                 
