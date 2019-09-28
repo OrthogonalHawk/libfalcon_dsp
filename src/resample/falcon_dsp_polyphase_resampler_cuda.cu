@@ -151,7 +151,7 @@ namespace falcon_dsp
          *  input data from global memory and to prevent memory buffer collisions
          *  between CUDA threads in the same warp */
         m_num_outputs_per_cuda_thread = static_cast<uint32_t>(
-                                            std::ceil(static_cast<float>(falcon_dsp::calculate_filter_delay(filter_coeffs.size(), up_rate, down_rate)) / 
+                                            std::ceil(static_cast<float>(falcon_dsp::calculate_filter_delay_from_up_down_rates(filter_coeffs.size(), up_rate, down_rate)) /
                                                       static_cast<float>(falcon_dsp_polyphase_resampler_cuda<T, C>::m_avg_advance_per_output_sample)));
 
         if (m_num_outputs_per_cuda_thread > MAX_NUM_OUTPUTS_PER_CUDA_THREAD)

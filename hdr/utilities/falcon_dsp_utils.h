@@ -86,7 +86,17 @@ namespace falcon_dsp
      * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
      * @return Filter delay  in samples
      */
-    uint32_t calculate_filter_delay(uint32_t num_coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps);
+    uint32_t calculate_filter_delay_from_sample_rates(uint32_t num_coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps);
+
+    /* @brief Computes filter delay in terms of samples
+     * @description Computes the filter delay in samples based on the provided
+     *               filter coefficients and previously computed resampling ratio.
+     * @param[in]  num_coeffs               - number of filter coefficients
+     * @param[in]  up_rate                  - upsampling rate
+     * @param[int] down_rate                - downsampling rate
+     * @return Filter delay  in samples
+     */
+    uint32_t calculate_filter_delay_from_up_down_rates(uint32_t num_coeffs, uint32_t up_rate, uint32_t down_rate);
 
     /* @brief Computes the greatest common denominator between two numbers
      * @param[in] a - first value to consider

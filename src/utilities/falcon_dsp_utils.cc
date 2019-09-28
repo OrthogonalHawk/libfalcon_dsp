@@ -83,22 +83,35 @@ namespace falcon_dsp
      * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
      * @return Filter delay  in samples
      */
-    uint32_t calculate_filter_delay(uint32_t num_coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps)
+    uint32_t calculate_filter_delay_from_sample_rates(uint32_t num_coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps)
     {
         /* compute the required up and down sample rates */
         int64_t up_rate, down_rate;
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
 
+        return calculate_filter_delay_from_up_down_rates(num_coeffs, up_rate, down_rate);
+    }
+
+    /* @brief Computes filter delay in terms of samples
+     * @description Computes the filter delay in samples based on the provided
+     *               filter coefficients and resampling ratio.
+     * @param[in]  num_coeffs               - number of filter coefficients
+     * @param[in]  in_sample_rate_in_sps    - input data sample rate in samples per second
+     * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
+     * @return Filter delay  in samples
+     */
+    uint32_t calculate_filter_delay_from_up_down_rates(uint32_t num_coeffs, uint32_t up_rate, uint32_t down_rate)
+    {
         int64_t divisor = up_rate;
-        if (out_sample_rate_in_sps > in_sample_rate_in_sps)
+        if (up_rate > down_rate)
         {
             divisor = down_rate;
         }
-        
+
         std::cout << "up: " << up_rate << " down: " << down_rate << std::endl;
         std::cout << "max: " << std::max(up_rate, down_rate) << std::endl;
-        
+
         return num_coeffs / divisor / 2;
     }
 

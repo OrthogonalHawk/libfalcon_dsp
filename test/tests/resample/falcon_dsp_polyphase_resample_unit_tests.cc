@@ -120,7 +120,7 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
     
     std::cout << "Read " << expected_out_data.size() << " input files from " << expected_output_file_name << std::endl;
     
-    uint32_t filter_delay = falcon_dsp::calculate_filter_delay(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
     std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
     
     auto start = std::chrono::high_resolution_clock::now();
