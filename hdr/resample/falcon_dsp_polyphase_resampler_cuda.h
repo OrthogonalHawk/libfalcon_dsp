@@ -159,10 +159,11 @@ namespace falcon_dsp
     
     private:
         
-        bool compute_kernel_params(int64_t cur_x_idx, size_t in_size,
-                                   uint32_t& num_out_samples,
-                                   uint32_t& new_t,
-                                   int64_t&  new_x_idx);
+        void compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_t,
+                                        uint32_t max_out_samples,
+                                        uint32_t& num_out_samples,
+                                        uint32_t& new_t,
+                                        int64_t& new_x_idx);
 
         uint32_t get_average_advance_in_samples(void);
 

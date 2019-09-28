@@ -158,6 +158,10 @@ namespace falcon_dsp
         {
             m_num_outputs_per_cuda_thread = MAX_NUM_OUTPUTS_PER_CUDA_THREAD;
         }
+        
+       /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+        *  can better handle complex<float> data, which is natively 8 bytes in size */
+       cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
     }
     
     template<class T, class C>
@@ -227,6 +231,13 @@ namespace falcon_dsp
         uint32_t thread_t = start_t;
         
         int64_t thread_start_output_sample_idx = thread_index * num_outputs_per_cuda_thread;
+        
+        /* verify that this thread has at least one output to compute */
+        if (thread_start_output_sample_idx >= out_len)
+        {
+            return;
+        }
+        
         for (int64_t out_sample_idx = 0;
              out_sample_idx < thread_start_output_sample_idx;
              ++out_sample_idx)
@@ -246,7 +257,12 @@ namespace falcon_dsp
         int64_t thread_data_start_idx = out_samples[0].data_start_idx;
         int64_t thread_data_stop_idx =  out_samples[0].data_stop_idx;
         
-        for (uint32_t out_sample_idx = 1; out_sample_idx < num_outputs_per_cuda_thread; ++out_sample_idx)
+        /* ensure that the output sample is still within the range of the
+         *  configured output data; there may be cases where some threads in
+         *  a thread block are not needed. */
+        for (uint32_t out_sample_idx = 1;
+             out_sample_idx < num_outputs_per_cuda_thread && (out_sample_idx + thread_start_output_sample_idx) < out_len;
+             ++out_sample_idx)
         {
             /* compute the next output sample 'cycle' updates */
             thread_t += down_rate;
@@ -317,7 +333,7 @@ namespace falcon_dsp
         cuFloatComplex * cuda_input_data = static_cast<cuFloatComplex *>(m_cuda_input_samples);
         cuFloatComplex * cuda_output_data = static_cast<cuFloatComplex *>(m_cuda_output_samples);
         
-        /* clear out the output and the allocate space for the resulting data */
+        /* clear out the output and allocate space for the resulting data */
         out.clear();
         out.reserve(needed_out_count(in.size()));
         for (uint32_t out_idx = 0;
@@ -375,24 +391,19 @@ namespace falcon_dsp
             /* if possible, handle multiple samples at once using CUDA. check for whether or not
              *  the state array was required as a way to detect samples at the beginning of the
              *  input vector */
-            uint32_t num_out_samples, new_t;
-            int64_t new_x_idx;
             if (!required_state_array &&
-                compute_kernel_params(x_idx, in.size(), num_out_samples, new_t, new_x_idx) &&
+                (out.size() - cur_out_idx) > 0 &&
                 m_transposed_coeffs.size() < MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK)
             {
-                uint32_t num_thread_blocks = num_out_samples / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
-                if (num_out_samples % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
+                uint32_t num_thread_blocks = (out.size() - cur_out_idx) / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
+                if ((out.size() - cur_out_idx) % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
                 {
                     num_thread_blocks++;
                 }
                 
-                printf("Num required thread blocks: %u for %u out samples\n",
-                    num_thread_blocks, num_out_samples);
-
-                /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
-                 *  can better handle complex<float> data, which is natively 8 bytes in size */
-                cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+                printf("Num required thread blocks(%u threads):%u for %u output samples (%u per thread)\n",
+                    MAX_NUM_CUDA_THREADS, num_thread_blocks,
+                    static_cast<uint32_t>((out.size() - cur_out_idx)), m_num_outputs_per_cuda_thread);
 
                 _polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                         cuda_input_data,
@@ -407,20 +418,27 @@ namespace falcon_dsp
                         m_t,
                         m_up_rate,
                         m_down_rate);
-                
+
+                uint32_t num_outputs_from_thread_blocks, new_t;
+                int64_t new_x_idx;
+                compute_next_filter_params(x_idx, in.size(), m_t,
+                                           (out.size() - cur_out_idx),
+                                           num_outputs_from_thread_blocks,
+                                           new_t, new_x_idx);
+
                 /* wait for GPU to finish before accessing on host */
                 cudaDeviceSynchronize();
                 
                 /* copy output samples out of CUDA memory */
                 cudaMemcpy(out.data() + cur_out_idx,
                            cuda_output_data,
-                           num_out_samples * sizeof(std::complex<float>),
+                           num_outputs_from_thread_blocks * sizeof(std::complex<float>),
                            cudaMemcpyDeviceToHost);
                 
                 /* update tracking parameters */
                 m_t = new_t;
                 x_idx += new_x_idx;
-                cur_out_idx += num_out_samples;
+                cur_out_idx += num_outputs_from_thread_blocks;
             }
             else
             {               
@@ -468,22 +486,21 @@ namespace falcon_dsp
         /* number of samples computed */
         return out.size();
     }
-                 
+    
     template<class T, class C>
-    bool falcon_dsp_polyphase_resampler_cuda<T, C>::compute_kernel_params(int64_t cur_x_idx,
-                                                                          size_t in_size,
-                                                                          uint32_t& num_out_samples,
-                                                                          uint32_t& new_t,
-                                                                          int64_t&  new_x_idx)
+    void falcon_dsp_polyphase_resampler_cuda<T, C>::compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_t,
+                                                                               uint32_t max_out_samples,
+                                                                               uint32_t& num_out_samples,
+                                                                               uint32_t& new_t,
+                                                                               int64_t& new_x_idx)
     {
-        uint32_t local_t = falcon_dsp_polyphase_resampler<T, C>::m_t;
+        uint32_t local_t = cur_t;
         new_x_idx = cur_x_idx;
 
         num_out_samples = 0;
         new_t = local_t;
         
-        bool reached_limit = false;
-        while (!reached_limit && new_x_idx < in_size)
+        while (num_out_samples < max_out_samples && new_x_idx < in_size)
         {
             /* compute the next 'cycle' updates */
             local_t += falcon_dsp_polyphase_resampler<T, C>::m_down_rate;
@@ -495,8 +512,6 @@ namespace falcon_dsp
             num_out_samples++;
             new_t = local_t;
         }
-        
-        return (num_out_samples > 0);
     }
     
     template<class T, class C>
