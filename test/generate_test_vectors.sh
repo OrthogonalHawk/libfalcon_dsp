@@ -51,7 +51,7 @@ jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb 
 export FREQ_SHIFT=0
 export INPUT_SAMPLE_RATE=1000000
 export OUTPUT_SAMPLE_RATE=500000
-export NUM_OUTPUT_SAMPLES=10000
+export NUM_OUTPUT_SAMPLES=100000
 export OUT_FILE_NAME=../vectors/test_004
 export RAMP_OUTPUT=0
 
@@ -62,7 +62,7 @@ jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb 
 export FREQ_SHIFT=0
 export INPUT_SAMPLE_RATE=1000000
 export OUTPUT_SAMPLE_RATE=600000
-export NUM_OUTPUT_SAMPLES=10000
+export NUM_OUTPUT_SAMPLES=1000000
 export OUT_FILE_NAME=../vectors/test_005
 export RAMP_OUTPUT=0
 
@@ -100,5 +100,27 @@ export OUT_FILE_NAME=../vectors/test_008
 export RAMP_OUTPUT=0
 
 jupyter nbconvert --to notebook --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_008.ipynb
+
+
+# 009 - no frequency shift; 1 MHz -> 44 kHz
+export FREQ_SHIFT=0
+export INPUT_SAMPLE_RATE=1000000
+export OUTPUT_SAMPLE_RATE=44000
+export NUM_OUTPUT_SAMPLES=100000
+export OUT_FILE_NAME=../vectors/test_009
+export RAMP_OUTPUT=0
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_polyphase_test_vectors.ipynb --output tmp_notebooks/generate_polyphase_test_vectors_009.ipynb
+
+
+# 010 - no frequency shift; FIR filtering
+export FILTER_ORDER=128
+export NUM_TONES=4
+export INPUT_SAMPLE_RATE=1000000
+export NUM_OUTPUT_SAMPLES=100000
+export OUT_FILE_NAME=../vectors/test_010
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_fir_filter_test_vectors.ipynb --output tmp_notebooks/generate_fir_filter_test_vectors_010.ipynb
+
 
 cd ../

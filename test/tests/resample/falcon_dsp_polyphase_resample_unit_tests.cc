@@ -39,6 +39,8 @@
  * @section  HISTORY
  *
  * 25-Aug-2019  OrthogonalHawk  File created.
+ * 20-Jan-2020  OrthogonalHawk  Adding cpp_resample_009 and updating to reflect
+ *                               library refactoring.
  *
  *****************************************************************************/
 
@@ -53,7 +55,6 @@
 #include <gtest/gtest.h>
 
 #include "resample/falcon_dsp_resample.h"
-#include "transform/falcon_dsp_transform.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -224,6 +225,20 @@ TEST(falcon_dsp_resample, cpp_resample_008)
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 450e3;
+    
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+}
+
+TEST(falcon_dsp_resample, cpp_resample_009)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_009_x.bin";
+    std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_009.filter_coeffs.txt";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_009_y.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 44e3;
     
     run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);

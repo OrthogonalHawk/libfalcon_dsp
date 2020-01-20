@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 04-Jun-2019  OrthogonalHawk  File created.
+ * 20-Jan-2020  OrthogonalHawk  Update to reflect movement from falcon_dsp_transform.h
  *
  *****************************************************************************/
 
@@ -49,7 +50,7 @@
 #include <iostream>
 #include <stdint.h>
 
-#include "transform/falcon_dsp_transform.h"
+#include "transform/falcon_dsp_freq_shift.h"
 
 /******************************************************************************
  *                                 CONSTANTS
