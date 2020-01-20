@@ -51,7 +51,7 @@
 
 #include <gtest/gtest.h>
 
-#include "transform/falcon_dsp_transform.h"
+#include "transform/falcon_dsp_freq_shift_cuda.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -81,6 +81,8 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
                                                         falcon_dsp::file_type_e::BINARY, in_data));
     
+    std::cout << "Read " << in_data.size() << " samples from " << input_file_name << std::endl;
+
     std::vector<std::complex<int16_t>> expected_out_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(expected_output_file_name,
                                                         falcon_dsp::file_type_e::BINARY, expected_out_data));
@@ -104,8 +106,8 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
     
     for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
     {
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01);
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01);
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
     }
 }
 

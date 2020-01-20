@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 OrthogonalHawk
+ * Copyright (c) 2020 OrthogonalHawk
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -25,25 +25,26 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_transform.h
+ * @file     falcon_dsp_freq_shift_cuda.h
  * @author   OrthogonalHawk
- * @date     04-Jun-2019
+ * @date     19-Jan-2020
  *
- * @brief    Signal processing transformation functions; C++ and CUDA versions.
+ * @brief    Signal processing transformation functions for frequency shifting;
+ *            CUDA versions.
  *
  * @section  DESCRIPTION
  *
- * Defines a series of signal processing transformation functions. Includes
- *  C++ and CUDA implementations.
+ * Defines a set of signal processing transformation frequency shift functions.
+ *  Includes CUDA implementations.
  *
  * @section  HISTORY
  *
- * 04-Jun-2019  OrthogonalHawk  File created.
+ * 19-Jan-2020  OrthogonalHawk  File broken out from falcon_dsp_transform.h
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_TRANSFORM_H__
-#define __FALCON_DSP_TRANSFORM_H__
+#ifndef __FALCON_DSP_TRANSFORM_FREQ_SHIFT_CUDA_H__
+#define __FALCON_DSP_TRANSFORM_FREQ_SHIFT_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
@@ -52,6 +53,10 @@
 #include <complex>
 #include <mutex>
 #include <vector>
+
+#include <cuComplex.h>
+
+#include "transform/falcon_dsp_freq_shift.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -65,49 +70,11 @@
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                           FUNCTION DECLARATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
-    /* @brief C++ implementation of a frequency shift vector operation.
-     * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
-     *                                      per second.
-     * @param[in] in                    - input vector
-     * @param[in] freq_shift_in_hz      - amount to frequency shift in Hz
-     * @param[out] out                  - frequency shifted vector
-     * @return True if the input vector was frequency shifted as requested;
-     *          false otherwise.
-     */
-    bool freq_shift(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
-                    int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out);
-    
-    /* @brief C++ implementation of a frequency shift utility class.
-     * @description By implementing the frequency shift utility as a class
-     *               interface instead of a simple function the user is able
-     *               to shift an arbitrarily long input with minimal discontinuities.
-     */
-    class falcon_dsp_freq_shift
-    {
-    public:
-
-        falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
-        virtual ~falcon_dsp_freq_shift(void) = default;
-
-        falcon_dsp_freq_shift(void) = delete;
-        falcon_dsp_freq_shift(const falcon_dsp_freq_shift&) = delete;
-
-        void reset_state(void);
-        virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
-
-    protected:
-    
-        std::mutex m_mutex;
-        double     m_samples_handled;
-        uint32_t   m_calculated_rollover_sample_idx;
-        float      m_angular_freq;
-    };
+    /******************************************************************************
+     *                           FUNCTION DECLARATION
+     *****************************************************************************/
     
     /* @brief CUDA implementation of a frequency shift vector operation.
      * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
@@ -120,6 +87,22 @@ namespace falcon_dsp
      */
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
                          int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out);
+    
+    /* CUDA kernel function that applies a frequency shift and puts the shifted data
+     *  into a (new?) memory location. can either be used to modify the data in-place
+     *  or to make a new vector with the shifted data. */
+    __global__
+    void __freq_shift(uint32_t num_samples_handled_previously,
+                      uint32_t time_shift_rollover_sample_idx,
+                      double angular_freq,
+                      cuFloatComplex * in_data,
+                      cuFloatComplex * out_data,
+                      uint32_t data_size);
+    
+    
+    /******************************************************************************
+     *                            CLASS DECLARATION
+     *****************************************************************************/
     
     /* @brief CUDA implementation of a frequency shift utility class.
      * @description Derives from the C++ version since there is significant overlap
@@ -149,8 +132,4 @@ namespace falcon_dsp
     };
 }
 
-/******************************************************************************
- *                            CLASS DECLARATION
- *****************************************************************************/
-
-#endif // __FALCON_DSP_TRANSFORM_H__
+#endif // __FALCON_DSP_TRANSFORM_FREQ_SHIFT_CUDA_H__

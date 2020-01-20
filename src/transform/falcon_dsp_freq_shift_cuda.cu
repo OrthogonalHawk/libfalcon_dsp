@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 04-Jun-2019  OrthogonalHawk  File created.
+ * 19-Jan-2020  OrthogonalHawk  Refactored to use falcon_dsp_freq_shift_cuda.h
  *
  *****************************************************************************/
 
@@ -49,9 +50,7 @@
 #include <iostream>
 #include <stdint.h>
 
-#include <cuComplex.h>
-
-#include "transform/falcon_dsp_transform.h"
+#include "transform/falcon_dsp_freq_shift_cuda.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -65,53 +64,11 @@
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
-    /* CUDA kernel function that applies a frequency shift */
-    __global__
-    void _freq_shift(uint32_t num_samples_handled_previously,
-                     uint32_t time_shift_rollover_sample_idx,
-                     double   angular_freq,
-                     cuFloatComplex * data,
-                     uint32_t data_size)
-    {
-        /* retrieve the data index that corresponds to this thread */
-        uint32_t data_index = blockIdx.x * blockDim.x + threadIdx.x;
-     
-        /* catch the case where the input size is not an integer
-         *  multiple of the thread block size */
-        if (data_index > data_size)
-        {
-            return;
-        }
-        
-        /* compute the time shift index for the current thread */
-        uint64_t orig_time_shift_idx = num_samples_handled_previously + data_index;
-        uint64_t time_shift_idx = orig_time_shift_idx;
-        
-        for (uint32_t ii = 0; ii < 1; ++ii)
-        {
-            time_shift_idx += ii;
-            time_shift_idx %= time_shift_rollover_sample_idx;
-            
-            /* compute the frequency shift multiplier value */
-            float angle = angular_freq * time_shift_idx;
-            float real = cosf(angle);
-            float imag = sinf(angle);
-            
-            /* create a CUDA complex variable to apply the freqency shift */
-            cuFloatComplex shift;
-            shift.x = real;
-            shift.y = imag;
-
-            /* apply the frequency shift in-place */
-            data[data_index] = cuCmulf(data[data_index], shift);
-        }
-    }
+    /******************************************************************************
+     *                        FUNCTION IMPLEMENTATION
+     *****************************************************************************/
     
     /* @brief CUDA implementation of a frequency shift vector operation.
      * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
@@ -128,6 +85,61 @@ namespace falcon_dsp
         falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
         return freq_shifter.apply(in, out);
     }
+    
+    /* CUDA kernel function that applies a frequency shift and puts the shifted data
+     *  into a (new?) memory location. can either be used to modify the data in-place
+     *  or to make a new vector with the shifted data. */
+    __global__
+    void __freq_shift(uint32_t num_samples_handled_previously,
+                      uint32_t time_shift_rollover_sample_idx,
+                      double angular_freq,
+                      cuFloatComplex * in_data,
+                      cuFloatComplex * out_data,
+                      uint32_t data_size)
+    {
+        /* retrieve the data index that corresponds to this thread */
+        uint32_t data_index = blockIdx.x * blockDim.x + threadIdx.x;
+     
+        /* catch the case where the input size is not an integer
+         *  multiple of the thread block size */
+        if (data_index > data_size)
+        {
+            return;
+        }
+        
+        /* compute the time shift index for the current thread */
+        uint64_t orig_time_shift_idx = num_samples_handled_previously + data_index;
+        uint64_t time_shift_idx = orig_time_shift_idx;
+        
+        float freq_shift_angle = 0.;
+        float freq_shift_real = 0.;
+        float freq_shift_imag = 0.;
+        cuFloatComplex freq_shift;
+                    
+        for (uint32_t ii = 0; ii < 1; ++ii)
+        {
+            time_shift_idx += ii;
+            time_shift_idx %= time_shift_rollover_sample_idx;
+            
+            /* compute the frequency shift multiplier value */
+            freq_shift_angle = angular_freq * time_shift_idx;
+            freq_shift_real = cosf(freq_shift_angle);
+            freq_shift_imag = sinf(freq_shift_angle);
+            
+            /* create a CUDA complex variable to apply the freqency shift */
+            freq_shift.x = freq_shift_real;
+            freq_shift.y = freq_shift_imag;
+
+            /* apply the frequency shift; may be used to modify data in place or to put
+             *  the output into a new vector based on the input arguments */
+            out_data[data_index] = cuCmulf(in_data[data_index], freq_shift);
+        }
+    }
+    
+    
+    /******************************************************************************
+     *                           CLASS IMPLEMENTATION
+     *****************************************************************************/
     
     falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
       : falcon_dsp_freq_shift(input_sample_rate_in_sps, freq_shift_in_hz),
@@ -186,11 +198,12 @@ namespace falcon_dsp
         /* run kernel on the GPU */
         uint32_t thread_block_size = 256;
         uint32_t num_thread_blocks = (in.size() + thread_block_size - 1) / thread_block_size;
-        _freq_shift<<<num_thread_blocks, thread_block_size>>>(m_samples_handled,
-                                                              m_calculated_rollover_sample_idx,
-                                                              m_angular_freq,
-                                                              cuda_data,
-                                                              in.size());
+        __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_samples_handled,
+                                                               m_calculated_rollover_sample_idx,
+                                                               m_angular_freq,
+                                                               cuda_data,
+                                                               cuda_data, /* modify in place */
+                                                               in.size());
         
         /* wait for GPU to finish before accessing on host */
         cudaDeviceSynchronize();

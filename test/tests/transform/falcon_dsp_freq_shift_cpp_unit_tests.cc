@@ -52,7 +52,7 @@
 
 #include <gtest/gtest.h>
 
-#include "transform/falcon_dsp_transform.h"
+#include "transform/falcon_dsp_freq_shift.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -82,6 +82,8 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
                                                         falcon_dsp::file_type_e::BINARY, in_data));
     
+    std::cout << "Read " << in_data.size() << " samples from " << input_file_name << std::endl;
+
     std::vector<std::complex<int16_t>> expected_out_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(expected_output_file_name,
                                                         falcon_dsp::file_type_e::BINARY, expected_out_data));

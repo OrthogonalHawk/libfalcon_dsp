@@ -56,7 +56,7 @@ CC_SOURCES = \
 CUDA_SOURCES = \
     src/math/falcon_dsp_add_cuda.cu \
     src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
-    src/resample/falcon_dsp_resample.cu \
+    src/resample/falcon_dsp_resample_cuda.cu \
     src/transform/falcon_dsp_freq_shift_cuda.cu \
     
 ###############################################################################
@@ -77,4 +77,4 @@ INC_PATH += \
     -I./hdr/math \
     -I./hdr/resample
     
-NVCCFLAGS += $(INC_PATH) -std=c++11 -O3 -fPIC
+NVCCFLAGS += $(INC_PATH) -std=c++11 -O3

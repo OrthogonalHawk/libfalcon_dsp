@@ -54,7 +54,7 @@ CC_SOURCES = \
     ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
     tests/resample/falcon_dsp_polyphase_resample_unit_tests.cc \
-    tests/transform/falcon_dsp_freq_shift_unit_tests.cc \
+    tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
