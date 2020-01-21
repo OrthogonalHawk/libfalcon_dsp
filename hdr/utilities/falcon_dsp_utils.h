@@ -140,6 +140,22 @@ namespace falcon_dsp
      */
     void rat_approx(double f, int64_t md, int64_t &num, int64_t &denom);
     
+    /* @brief Writes a data vector to a file
+     * @param file_name   - Name of the file to write
+     * @param data        - Data vector to write
+     * @return true if the file was written successfully; false otherwise.
+     */
+    bool write_data_to_file(std::string file_name, file_type_e type, std::vector<int16_t>& data);
+    bool write_data_to_file(std::string file_name, file_type_e type, std::vector<float>& data);
+    
+    /* @brief Reads data vector from a file
+     * @param[in] file_name   - Name of the file to read
+     * @param[out] data       - Data vector read from the file
+     * @return true if the file was read successfully; false otherwise.
+     */
+    bool read_data_from_file(std::string file_name, file_type_e type, std::vector<int16_t>& data);
+    bool read_data_from_file(std::string file_name, file_type_e type, std::vector<float>& data);
+    
     /* @brief Writes a complex data vector to a file
      * @param file_name   - Name of the file to write
      * @param data        - Data vector to write

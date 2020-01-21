@@ -40,6 +40,8 @@
  *
  * 10-May-2019  OrthogonalHawk  File created.
  * 04-Jun-2019  OrthogonalHawk  Added floating-point ASCII file read/write tests.
+ * 21-Jan-2020  OrthogonalHawk  Added tests for non-complex int16_t and float
+ *                               read/write functions.
  *
  *****************************************************************************/
 
@@ -320,5 +322,71 @@ TEST(falcon_dsp_utils, file_write_and_read_05)
     {
         EXPECT_EQ(ii % 128, in_data[ii].real());
         EXPECT_EQ(-1 * (ii % 128), in_data[ii].imag());
+    }
+}
+
+TEST(falcon_dsp_utils, file_write_and_read_06)
+{
+    std::string TEST_FILE_NAME = "vectors/file_read_write_test_06.bin";
+    
+    std::vector<int16_t> data_to_write;
+    for (int16_t ii = -128; ii < 128; ++ii)
+    {
+        data_to_write.push_back(ii);
+    }
+    
+    EXPECT_TRUE(falcon_dsp::write_data_to_file(TEST_FILE_NAME, falcon_dsp::file_type_e::BINARY, data_to_write));
+    
+    std::vector<int16_t> read_from_file;
+    EXPECT_TRUE(falcon_dsp::read_data_from_file(TEST_FILE_NAME, falcon_dsp::file_type_e::BINARY, read_from_file));
+    
+    EXPECT_EQ(data_to_write.size(), read_from_file.size());
+    for (uint32_t ii = 0; ii < data_to_write.size() && ii < read_from_file.size(); ++ii)
+    {
+        EXPECT_EQ(read_from_file[ii], data_to_write[ii]);
+    }
+}
+
+TEST(falcon_dsp_utils, file_write_and_read_07)
+{
+    std::string TEST_FILE_NAME = "vectors/file_read_write_test_07.txt";
+    
+    std::vector<int16_t> data_to_write;
+    for (int16_t ii = -128; ii < 128; ++ii)
+    {
+        data_to_write.push_back(ii);
+    }
+    
+    EXPECT_TRUE(falcon_dsp::write_data_to_file(TEST_FILE_NAME, falcon_dsp::file_type_e::ASCII, data_to_write));
+    
+    std::vector<int16_t> read_from_file;
+    EXPECT_TRUE(falcon_dsp::read_data_from_file(TEST_FILE_NAME, falcon_dsp::file_type_e::ASCII, read_from_file));
+    
+    EXPECT_EQ(data_to_write.size(), read_from_file.size());
+    for (uint32_t ii = 0; ii < data_to_write.size() && ii < read_from_file.size(); ++ii)
+    {
+        EXPECT_EQ(read_from_file[ii], data_to_write[ii]);
+    }
+}
+
+TEST(falcon_dsp_utils, file_write_and_read_08)
+{
+    std::string TEST_FILE_NAME = "vectors/file_read_write_test_08.txt";
+    
+    std::vector<float> data_to_write;
+    for (int16_t ii = -128.0; ii < 128.0; ++ii)
+    {
+        data_to_write.push_back(ii + 0.5);
+    }
+    
+    EXPECT_TRUE(falcon_dsp::write_data_to_file(TEST_FILE_NAME, falcon_dsp::file_type_e::ASCII, data_to_write));
+    
+    std::vector<float> read_from_file;
+    EXPECT_TRUE(falcon_dsp::read_data_from_file(TEST_FILE_NAME, falcon_dsp::file_type_e::ASCII, read_from_file));
+    
+    EXPECT_EQ(data_to_write.size(), read_from_file.size());
+    for (uint32_t ii = 0; ii < data_to_write.size() && ii < read_from_file.size(); ++ii)
+    {
+        EXPECT_EQ(read_from_file[ii], data_to_write[ii]);
     }
 }

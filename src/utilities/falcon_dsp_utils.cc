@@ -293,6 +293,238 @@ namespace falcon_dsp
         num = neg ? -h[1] : h[1];
     }
 
+    /* @brief Writes a data vector to a file
+     * @param file_name   - Name of the file to write
+     * @param data        - Data vector to write
+     * @return true if the file was written successfully; false otherwise.
+     */
+    bool write_data_to_file(std::string file_name, file_type_e type, std::vector<int16_t>& data)
+    {
+        bool ret = true;
+        
+        if (type == file_type_e::BINARY)
+        {
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out | std::ios::binary);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                int16_t next_val = *iter;
+                output_file.write(reinterpret_cast<char *>(&next_val), sizeof(int16_t));
+
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                output_file << *iter << std::endl;
+                
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
+        }
+        else
+        {
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
+    /* @brief Writes a data vector to a file
+     * @param file_name   - Name of the file to write
+     * @param data        - Data vector to write
+     * @return true if the file was written successfully; false otherwise.
+     */
+    bool write_data_to_file(std::string file_name, file_type_e type, std::vector<float>& data)
+    {
+        bool ret = true;
+        
+        if (type == file_type_e::BINARY)
+        {
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out | std::ios::binary);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                float next_val = (*iter);
+                output_file.write(reinterpret_cast<char *>(&next_val), sizeof(float));
+
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                output_file << *iter << std::endl;
+                
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
+        }
+        else
+        {
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
+    /* @brief Reads data vector from a file
+     * @param[in] file_name   - Name of the file to read
+     * @param[out] data       - Data vector read from the file
+     * @return true if the file was read successfully; false otherwise.
+     */
+    bool read_data_from_file(std::string file_name, file_type_e type, std::vector<int16_t>& data)
+    {
+        bool ret = true;
+        data.clear();
+        
+        if (type == file_type_e::BINARY)
+        {
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in | std::ios::binary);
+            if (!input_file.is_open())
+            {
+                std::cerr << "Unable to open BINARY input file " << file_name << std::endl;
+                return false;
+            }
+
+            /* get the file size in bytes */
+            input_file.seekg(0, std::ios::end);
+            auto file_size_in_bytes = input_file.tellg();
+            input_file.seekg(0, std::ios::beg);
+
+            uint32_t expected_number_of_samples = file_size_in_bytes / sizeof(int16_t);
+            for (uint32_t ii = 0; ii < expected_number_of_samples; ++ii)
+            {
+                char buf[sizeof(int16_t)];
+                input_file.read(buf, sizeof(int16_t));
+
+                /* note that this code assumes that the binary file was written in a
+                 *  little endian format */
+                int16_t next_val = static_cast<int16_t>(((buf[1] << 8) & 0xFF00) | buf[0]);
+                data.push_back(next_val);
+
+                if (!input_file.good())
+                {
+                    data.clear();
+                    
+                    std::cerr << "Reached unexpected EOF at sample index " << ii
+                              << " of " << expected_number_of_samples << std::endl;
+                    return false;
+                }
+            }
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in);
+            if (!input_file.is_open())
+            {
+                std::cerr << "Unable to open ASCII input file " << file_name << std::endl;
+                return false;
+            }
+
+            int16_t next_val;
+            while (input_file >> next_val)
+            {
+                data.push_back(next_val);
+            }
+        }
+        else
+        {
+            std::cerr << "Unable to open input file " << file_name
+                      << " with unsupported type " << static_cast<uint32_t>(type) << std::endl;
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
+    /* @brief Reads data vector from a file
+     * @param[in] file_name   - Name of the file to read
+     * @param[out] data       - Data vector read from the file
+     * @return true if the file was read successfully; false otherwise.
+     */
+    bool read_data_from_file(std::string file_name, file_type_e type, std::vector<float>& data)
+    {
+        bool ret = true;
+        data.clear();
+        
+        if (type == file_type_e::BINARY)
+        {
+            std::cerr << "Reading BINARY files and returning floats is currently not supported" << std::endl;
+            ret = false;
+        }
+        else if (type == file_type_e::ASCII)
+        {
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in);
+            if (!input_file.is_open())
+            {
+                std::cerr << "Unable to open file " << file_name << std::endl;
+                return false;
+            }
+
+            float next_val;
+            while (input_file >> next_val)
+            {
+                data.push_back(next_val);
+            }
+        }
+        else
+        {
+            std::cerr << "Unsupported file type " << static_cast<uint32_t>(type) << std::endl;
+            ret = false;
+        }
+        
+        return ret;
+    }
+    
     /* @brief Writes a complex data vector to a file
      * @param file_name   - Name of the file to write
      * @param type        - File type/format
