@@ -75,61 +75,6 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void run_cpp_polar_discriminator_test(std::string input_data_file_name,
-                                      std::string expected_output_file_name)
-{
-    /* get the input data; only int16_t reading from file is supported at this time so it will need
-     *  to be converted to std::complex<float> */
-    std::vector<std::complex<int16_t>> in_int16_data;
-    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_data_file_name,
-                                                        falcon_dsp::file_type_e::BINARY, in_int16_data));
-    std::vector<std::complex<float>> in_data;
-    for (auto in_iter = in_int16_data.begin(); in_iter != in_int16_data.end(); ++in_iter)
-    {
-        in_data.push_back(std::complex<float>((*in_iter).real(), (*in_iter).imag()));
-    }
-    
-    std::cout << "Read " << in_data.size() << " samples from " << input_data_file_name << std::endl;
-    
-    /* get the expected output data; only int16_t reading from file is supported at this time so
-     *  it will need to be converted to std::complex<float> */
-    std::vector<int16_t> expected_out_int16_data;
-    EXPECT_TRUE(falcon_dsp::read_data_from_file(expected_output_file_name,
-                                                falcon_dsp::file_type_e::BINARY, expected_out_int16_data));
-    std::vector<float> expected_out_data;
-    for (auto out_iter = expected_out_int16_data.begin(); out_iter != expected_out_int16_data.end(); ++out_iter)
-    {
-        expected_out_data.push_back(static_cast<float>(*out_iter));
-    }
-    
-    EXPECT_EQ(in_data.size(), expected_out_data.size());
-    
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    /* now apply the polar discriminator and verify that the calculated output
-     *  matches the expected output */
-    std::vector<float> out_data;
-    EXPECT_TRUE(falcon_dsp::polar_discriminator(in_data, out_data));
-    
-    auto done = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_ms = done - start;
-    
-    std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
-    
-    EXPECT_EQ(in_data.size(), out_data.size());
-    
-    for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
-    {   
-        float max_diff = abs(expected_out_data[ii]) * 0.01;
-        if (max_diff < 10)
-        {
-            max_diff = 10;
-        }
-        
-        ASSERT_NEAR(expected_out_data[ii], out_data[ii], max_diff);
-    }
-}
-
 TEST(falcon_dsp_polar_discriminator, cpp_basic_polar_discriminator_float_000)
 {
     /*********************************************************
@@ -191,18 +136,3 @@ TEST(falcon_dsp_polar_discriminator, cpp_basic_polar_discriminator_int16_t_000)
         EXPECT_NEAR(out_data[ii], expected_out_data[ii], 0.0001);
     }
 }
-
-/*
-TEST(falcon_dsp_linear_filter, cpp_linear_filter_010)
-{
-    run_cpp_linear_filter_test("./vectors/test_010_x.bin",
-                               "./vectors/test_010.filter_coeffs.txt",
-                               "./vectors/test_010_y.bin");
-}
-
-TEST(falcon_dsp_linear_filter, cpp_linear_filter_011)
-{
-    run_cpp_linear_filter_test("./vectors/test_011_x.bin",
-                               "./vectors/test_011.filter_coeffs.txt",
-                               "./vectors/test_011_y.bin");
-} */
