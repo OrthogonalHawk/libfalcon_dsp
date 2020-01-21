@@ -75,17 +75,38 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void run_cpp_linear_filter_test(std::string input_file_name, std::string expected_output_file_name)
+void run_cpp_linear_filter_test(std::string input_data_file_name,
+                                std::string input_coeff_file_name,
+                                std::string expected_output_file_name)
 {
-    std::vector<std::complex<int16_t>> in_data;
-    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
-                                                        falcon_dsp::file_type_e::BINARY, in_data));
+    /* get the input data; only int16_t reading from file is supported at this time so it will need
+     *  to be converted to std::complex<float> */
+    std::vector<std::complex<int16_t>> in_int16_data;
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_data_file_name,
+                                                        falcon_dsp::file_type_e::BINARY, in_int16_data));
+    std::vector<std::complex<float>> in_data;
+    for (auto in_iter = in_int16_data.begin(); in_iter != in_int16_data.end(); ++in_iter)
+    {
+        in_data.push_back(std::complex<float>((*in_iter).real(), (*in_iter).imag()));
+    }
     
-    std::cout << "Read " << in_data.size() << " samples from " << input_file_name << std::endl;
+    std::cout << "Read " << in_data.size() << " samples from " << input_data_file_name << std::endl;
 
-    std::vector<std::complex<int16_t>> expected_out_data;
+    /* get the input coefficients */
+    std::vector<std::complex<float>> coeffs;
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_coeff_file_name,
+                                                        falcon_dsp::file_type_e::ASCII, coeffs));
+    
+    /* get the expected output data; only int16_t reading from file is supported at this time so
+     *  it will need to be converted to std::complex<float> */
+    std::vector<std::complex<int16_t>> expected_out_int16_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(expected_output_file_name,
-                                                        falcon_dsp::file_type_e::BINARY, expected_out_data));
+                                                        falcon_dsp::file_type_e::BINARY, expected_out_int16_data));
+    std::vector<std::complex<float>> expected_out_data;
+    for (auto out_iter = expected_out_int16_data.begin(); out_iter != expected_out_int16_data.end(); ++out_iter)
+    {
+        expected_out_data.push_back(std::complex<float>((*out_iter).real(), (*out_iter).imag()));
+    }
     
     EXPECT_EQ(in_data.size(), expected_out_data.size());
     
@@ -93,9 +114,8 @@ void run_cpp_linear_filter_test(std::string input_file_name, std::string expecte
     
     /* now filter the input and verify that the calculated output
      *  matches the expected output */
-    std::vector<std::complex<int16_t>> out_data;
-    //EXPECT_TRUE(falcon_dsp::freq_shift(input_sample_rate_in_sps, in_data,
-    //            freq_shift_in_hz, out_data));
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(falcon_dsp::fir_filter(coeffs, in_data, out_data));
     
     auto done = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration_ms = done - start;
@@ -282,4 +302,18 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_003)
         EXPECT_EQ(out_data[ii].real(), expected_out_data[ii].real());
         EXPECT_EQ(out_data[ii].imag(), expected_out_data[ii].imag());
     }
+}
+
+TEST(falcon_dsp_linear_filter, cpp_linear_filter_010)
+{
+    run_cpp_linear_filter_test("./vectors/test_010_x.bin",
+                               "./vectors/test_010.filter_coeffs.txt",
+                               "./vectors/test_010_y.bin");
+}
+
+TEST(falcon_dsp_linear_filter, cpp_linear_filter_011)
+{
+    run_cpp_linear_filter_test("./vectors/test_011_x.bin",
+                               "./vectors/test_011.filter_coeffs.txt",
+                               "./vectors/test_011_y.bin");
 }

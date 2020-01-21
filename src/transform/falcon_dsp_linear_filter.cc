@@ -87,6 +87,13 @@ namespace falcon_dsp
         return filter_obj.apply(in, out);
     }
 
+    bool fir_filter(std::vector<std::complex<float>> &coeffs, std::vector<std::complex<float>>& in,
+                    std::vector<std::complex<float>>& out)
+    {
+        falcon_dsp_fir_filter filter_obj(coeffs);
+        return filter_obj.apply(in, out);
+    }
+    
 
     /******************************************************************************
      *                           CLASS IMPLEMENTATION

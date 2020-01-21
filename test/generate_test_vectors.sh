@@ -123,4 +123,13 @@ export OUT_FILE_NAME=../vectors/test_010
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_fir_filter_test_vectors.ipynb --output tmp_notebooks/generate_fir_filter_test_vectors_010.ipynb
 
 
+# 011 - no frequency shift; FIR filtering
+export FILTER_ORDER=128
+export NUM_TONES=5
+export INPUT_SAMPLE_RATE=1000000
+export NUM_OUTPUT_SAMPLES=1000000
+export OUT_FILE_NAME=../vectors/test_011
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_fir_filter_test_vectors.ipynb --output tmp_notebooks/generate_fir_filter_test_vectors_011.ipynb
+
 cd ../

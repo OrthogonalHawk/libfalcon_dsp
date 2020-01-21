@@ -82,6 +82,9 @@ namespace falcon_dsp
     bool fir_filter(std::vector<std::complex<float>> &coeffs, std::vector<std::complex<int16_t>>& in,
                     std::vector<std::complex<int16_t>>& out);
     
+    bool fir_filter(std::vector<std::complex<float>> &coeffs, std::vector<std::complex<float>>& in,
+                    std::vector<std::complex<float>>& out);
+    
     
     /******************************************************************************
      *                            CLASS DECLARATION
