@@ -25,7 +25,7 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_freq_shift_unit_tests.cc
+ * @file     falcon_dsp_freq_shift_cpp_unit_tests.cc
  * @author   OrthogonalHawk
  * @date     08-Jun-2019
  *
@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 08-Jun-2019  OrthogonalHawk  File created.
+ * 20-Jan-2020  OrthogonalHawk  Renamed file to include 'cpp' substring.
  *
  *****************************************************************************/
 

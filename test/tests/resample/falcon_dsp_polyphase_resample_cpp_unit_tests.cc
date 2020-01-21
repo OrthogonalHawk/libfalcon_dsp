@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 OrthogonalHawk
+ * Copyright (c) 2020 OrthogonalHawk
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -25,7 +25,7 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_polyphase_resample_unit_tests.cc
+ * @file     falcon_dsp_polyphase_resample_cpp_unit_tests.cc
  * @author   OrthogonalHawk
  * @date     25-Aug-2019
  *
@@ -40,7 +40,8 @@
  *
  * 25-Aug-2019  OrthogonalHawk  File created.
  * 20-Jan-2020  OrthogonalHawk  Adding cpp_resample_009 and updating to reflect
- *                               library refactoring.
+ *                               library refactoring. Also renamed to include 'cpp'
+ *                               substring in file name.
  *
  *****************************************************************************/
 

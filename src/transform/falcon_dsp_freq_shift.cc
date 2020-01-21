@@ -70,6 +70,10 @@
 
 namespace falcon_dsp
 {
+    /******************************************************************************
+     *                        FUNCTION IMPLEMENTATION
+     *****************************************************************************/
+    
     /* @brief C++ implementation of a frequency shift vector operation.
      * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
      *                                      per second.
@@ -85,6 +89,11 @@ namespace falcon_dsp
         falcon_dsp_freq_shift freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
         return freq_shifter.apply(in, out);
     }
+    
+    
+    /******************************************************************************
+     *                            CLASS IMPLEMENTATION
+     *****************************************************************************/
     
     falcon_dsp_freq_shift::falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
       : m_samples_handled(0)
@@ -161,7 +170,3 @@ namespace falcon_dsp
         return out.size() > 0;
     }
 }
-
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
