@@ -52,11 +52,13 @@ CC_SOURCES = \
     ../src/resample/falcon_dsp_polyphase_resampler.cc \
     ../src/transform/falcon_dsp_freq_shift.cc \
     ../src/transform/falcon_dsp_linear_filter.cc \
+    ../src/transform/falcon_dsp_polar_discriminator.cc \
     ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
     tests/resample/falcon_dsp_polyphase_resample_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_linear_filter_cpp_unit_tests.cc \
+    tests/transform/falcon_dsp_polar_discriminator_cpp_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
