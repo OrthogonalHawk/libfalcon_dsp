@@ -195,7 +195,17 @@ namespace falcon_dsp
             }
         }
         
-        /* finished handling the current data; now update the state array */
+        /* finished handling the current data; now update the state array. note that the state array
+         *  is populated in such a way that the last sample in the state buffer is the sample
+         *  that is expected to immediately preceed the next sample.
+         *
+         * Example:
+         *   Data:   x1, x2, x3, x4, x5, x6, x7, x8
+         *   Coeffs: h1, h2, h3
+         *
+         * If the first four values, x1-x4, were passed to the apply method then the state
+         *  buffer will have x2-x4 when the apply method returns. state[0] = x2, state[1] = x3, state[2] = x4
+         */
         if (in.size() >= m_coefficients.size())
         {
             /* input vector is longer than the state array so copy in the last
@@ -220,12 +230,6 @@ namespace falcon_dsp
             if (num_elements_to_erase > 0)
             {
                 m_state.erase(m_state.begin(), m_state.begin() + num_elements_to_erase);
-            }
-            
-            std::cout << "State Buffer Contents:" << std::endl;
-            for (auto state_iter = m_state.begin(); state_iter != m_state.end(); ++state_iter)
-            {
-                std::cout << *state_iter << std::endl;
             }
         }
         
