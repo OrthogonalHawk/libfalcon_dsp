@@ -52,7 +52,7 @@
 
 #include <gtest/gtest.h>
 
-#include "transform/falcon_dsp_linear_filter.h"
+#include "transform/falcon_dsp_iir_filter.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -115,7 +115,7 @@ void run_cpp_iir_filter_test(std::string input_data_file_name,
     /* now filter the input and verify that the calculated output
      *  matches the expected output */
     std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(falcon_dsp::fir_filter(coeffs, in_data, out_data));
+    EXPECT_TRUE(falcon_dsp::iir_filter(coeffs, coeffs, in_data, out_data));
     
     auto done = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> duration_ms = done - start;

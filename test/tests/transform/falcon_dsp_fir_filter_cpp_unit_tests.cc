@@ -53,7 +53,7 @@
 
 #include <gtest/gtest.h>
 
-#include "transform/falcon_dsp_linear_filter.h"
+#include "transform/falcon_dsp_fir_filter.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************

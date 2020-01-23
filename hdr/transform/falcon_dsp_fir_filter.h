@@ -25,26 +25,27 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_linear_filter.h
+ * @file     falcon_dsp_fir_filter.h
  * @author   OrthogonalHawk
  * @date     20-Jan-2020
  *
- * @brief    Signal processing transformation functions for linear filtering;
+ * @brief    Signal processing transformation functions for FIR filtering;
  *            C++ versions.
  *
  * @section  DESCRIPTION
  *
- * Defines a set of signal processing transformation linear filtering functions.
+ * Defines a set of signal processing transformation FIR filtering functions.
  *  Includes C++ implementations.
  *
  * @section  HISTORY
  *
  * 20-Jan-2020  OrthogonalHawk  Created file.
+ * 22-Jan-2020  OrthogonalHawk  Renamed to focus on FIR filtering.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_TRANSFORM_LINEAR_FIR_FILTER_H__
-#define __FALCON_DSP_TRANSFORM_LINEAR_FIR_FILTER_H__
+#ifndef __FALCON_DSP_TRANSFORM_FIR_FILTER_H__
+#define __FALCON_DSP_TRANSFORM_FIR_FILTER_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
@@ -72,20 +73,6 @@ namespace falcon_dsp
     /******************************************************************************
      *                           FUNCTION DECLARATION
      *****************************************************************************/
- 
-    /* @brief C++ implementation of a linear IIR filter vector operation.
-     * @param[in] b_coeffs              - Numerator filter coefficients
-     * @param[in] a_coeffs              - Denominator filter coefficients
-     * @param[in] in                    - input vector
-     * @param[out] out                  - filtered vector
-     * @return True if the input vector was filtered as requested;
-     *          false otherwise.
-     */
-    bool iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs, 
-                    std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
-    
-    bool iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs, 
-                    std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
     
     /* @brief C++ implementation of a linear FIR filter vector operation.
      * @param[in] coeffs                - FIR filter coefficients
@@ -104,34 +91,6 @@ namespace falcon_dsp
     /******************************************************************************
      *                            CLASS DECLARATION
      *****************************************************************************/
-    
-    /* @brief C++ implementation of a linear IIR filter utility class.
-     * @description By implementing the linear IIR filter utility as a class
-     *               interface instead of a simple function the user is able
-     *               to filter an arbitrarily long input.
-     */
-    class falcon_dsp_iir_filter
-    {
-    public:
-
-        falcon_dsp_iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs);
-        virtual ~falcon_dsp_iir_filter(void) = default;
-
-        falcon_dsp_iir_filter(void) = delete;
-        falcon_dsp_iir_filter(const falcon_dsp_iir_filter&) = delete;
-
-        void reset_state(void);
-        virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
-        virtual bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
-
-    protected:
-    
-        std::mutex                               m_mutex;
-        std::vector<std::complex<float>>         m_b_coefficients;
-        std::vector<std::complex<float>>         m_a_coefficients;
-        std::vector<std::complex<float>>         m_input_state;
-        std::deque<std::complex<float>>          m_prev_outputs;
-    };
     
     /* @brief C++ implementation of a linear FIR filter utility class.
      * @description By implementing the linear FIR filter utility as a class
@@ -160,4 +119,4 @@ namespace falcon_dsp
     };
 }
 
-#endif // __FALCON_DSP_TRANSFORM_LINEAR_FIR_FILTER_H__
+#endif // __FALCON_DSP_TRANSFORM_FIR_FILTER_H__
