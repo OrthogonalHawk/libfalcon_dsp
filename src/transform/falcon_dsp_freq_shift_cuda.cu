@@ -56,6 +56,9 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
+const uint32_t DUMMY_SAMPLE_RATE_IN_SPS = 1e6;
+const float DUMMY_FREQ_SHIFT_IN_HZ = 0.0;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -171,51 +174,81 @@ namespace falcon_dsp
     /* CUDA kernel function that supports multi-channel frequency shifting. */
     __global__
     void __freq_shift_multi_chan(uint32_t num_samples_handled_previously,
-                                 uint32_t num_channels,
                                  freq_shift_channel_s * channels,
+                                 uint32_t num_channels,
+                                 uint32_t num_samples_to_process_per_thread,
                                  cuFloatComplex * in_data,
-                                 uint32_t num_samples_to_process)
+                                 uint32_t in_data_len)
     {
-        /* retrieve the data index that corresponds to this thread */
-        uint32_t data_index = blockIdx.x * blockDim.x + threadIdx.x;
+        /* retrieve the starting data index that corresponds to this thread */
+        uint32_t start_data_index = blockIdx.x * blockDim.x * num_samples_to_process_per_thread +
+                                        threadIdx.x * num_samples_to_process_per_thread;
      
-        /* catch the case where the input size is not an integer
-         *  multiple of the thread block size */
-        if (data_index > num_samples_to_process)
-        {
-            return;
-        }
-        
+        /* catch the case where the channel information is not available or where
+         *  the output buffer is shorter than the input buffer */
         for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
         {
-            /* compute the time shift index for the current channel and thread */
-            uint64_t orig_time_shift_idx = num_samples_handled_previously + data_index;
-            uint64_t time_shift_idx = orig_time_shift_idx;
-
-            float freq_shift_angle = 0.;
-            float freq_shift_real = 0.;
-            float freq_shift_imag = 0.;
-            cuFloatComplex freq_shift;
-
-            for (uint32_t ii = 0; ii < num_samples_to_process; ++ii)
+            if (channels[chan_idx].out_data == nullptr ||
+                channels[chan_idx].out_data_len < in_data_len)
             {
+                return;
+            }
+        }
+        
+        /* catch the case where the input size is not an integer
+         *  multiple of the thread block size */
+        for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
+        {
+            if (start_data_index > in_data_len ||
+                start_data_index > channels[chan_idx].out_data_len)
+            {
+                return;
+            }
+        }
+        
+        /* catch the case where this kernel cannot process the full number of samples
+         *  when the end of the input buffer is reached. note that due to the previous
+         *  check to make sure that the output buffer is at least as long as the input
+         *  buffer it is sufficient to only check the input buffer here */
+        uint32_t local_num_samples_to_process = num_samples_to_process_per_thread;
+        if ((start_data_index + local_num_samples_to_process) > in_data_len)
+        {
+            local_num_samples_to_process = in_data_len - start_data_index;
+        }
+        
+        /* compute the time shift index for the current thread */
+        uint64_t time_shift_idx = num_samples_handled_previously + start_data_index;
+        
+        float freq_shift_angle = 0.;
+        float freq_shift_real = 0.;
+        float freq_shift_imag = 0.;
+        cuFloatComplex freq_shift;
+        cuFloatComplex next_input_sample;
+        
+        for (uint32_t sample_idx = 0;
+             sample_idx < local_num_samples_to_process &&
+                 (start_data_index + sample_idx) < in_data_len;
+             ++sample_idx)
+        {
+            next_input_sample = in_data[start_data_index + sample_idx];
+            
+            for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
+            {
+                time_shift_idx = num_samples_handled_previously + start_data_index + sample_idx;
                 time_shift_idx %= channels[chan_idx].time_shift_rollover_sample_idx;
-
+            
                 /* compute the frequency shift multiplier value */
                 freq_shift_angle = channels[chan_idx].angular_freq * time_shift_idx;
                 freq_shift_real = cosf(freq_shift_angle);
                 freq_shift_imag = sinf(freq_shift_angle);
-
-                /* create a CUDA complex variable to apply the freqency shift */
+            
+                /* set a CUDA complex variable to apply the freqency shift */
                 freq_shift.x = freq_shift_real;
                 freq_shift.y = freq_shift_imag;
 
                 /* apply the frequency shift; may be used to modify data in place or to put
                  *  the output into a new vector based on the input arguments */
-                channels[chan_idx].out_data[data_index] = cuCmulf(in_data[data_index], freq_shift);
-                
-                /* finished with this sample; increment time index */
-                time_shift_idx++;
+                channels[chan_idx].out_data[start_data_index + sample_idx] = cuCmulf(next_input_sample, freq_shift);
             }
         }
     }
@@ -225,20 +258,58 @@ namespace falcon_dsp
      *****************************************************************************/
     
     falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
-      : falcon_dsp_freq_shift(input_sample_rate_in_sps, freq_shift_in_hz),
-        m_cuda_data_vector(nullptr),
-        m_max_num_cuda_input_samples(0)
-    { }
+      : falcon_dsp_freq_shift(DUMMY_SAMPLE_RATE_IN_SPS, DUMMY_FREQ_SHIFT_IN_HZ),
+        m_cuda_input_data(nullptr),
+        m_max_num_input_samples(0)
+    {
+        /* user is only requesting a single channel */
+        auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate_in_sps, freq_shift_in_hz);
+        std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
+        new_chan->time_shift_rollover_sample_idx = chan_params.first;
+        new_chan->angular_freq = chan_params.second;
+
+        m_freq_shift_channels.push_back(std::move(new_chan));
+        
+        /* allocate CUDA memory for the channel information; the master copy is kept
+         *  on the host, but is copied to the device when the 'apply' method is invoked */
+        cudaMallocManaged(&d_freq_shift_channels, m_freq_shift_channels.size() * sizeof(freq_shift_channel_s));
+    }
+
+    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(std::vector<std::pair<uint32_t, int32_t>> shift_channels)
+      : falcon_dsp_freq_shift(DUMMY_SAMPLE_RATE_IN_SPS, DUMMY_FREQ_SHIFT_IN_HZ),
+        m_cuda_input_data(nullptr),
+        m_max_num_input_samples(0)
+    {
+        /* user is requesting multiple channels */
+        for (auto chan_iter : shift_channels)
+        {
+            auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(chan_iter.first, chan_iter.second);
+            std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
+            new_chan->time_shift_rollover_sample_idx = chan_params.first;
+            new_chan->angular_freq = chan_params.second;
+
+            m_freq_shift_channels.push_back(std::move(new_chan));
+        }
+          
+        /* allocate CUDA memory for the channel information; the master copy is kept
+         *  on the host, but is copied to the device when the 'apply' method is invoked */
+        cudaMallocManaged(&d_freq_shift_channels, m_freq_shift_channels.size() * sizeof(freq_shift_channel_s));
+    }
     
     falcon_dsp_freq_shift_cuda::~falcon_dsp_freq_shift_cuda(void)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
-        /* clean up existing memory */
-        if (m_cuda_data_vector != nullptr)
+        /* the freq_shift_channel_s objects automatically delete CUDA memory if it
+         *  was allocated when the object is destroyed */
+        m_freq_shift_channels.clear();
+        
+        /* cleanup the CUDA memory that was reserved in the constructor to house
+         *  the channel information when CUDA kernels are running */
+        if (d_freq_shift_channels)
         {
-            cudaFree(m_cuda_data_vector);
-            m_cuda_data_vector = nullptr;
+            cudaFree(d_freq_shift_channels);
+            d_freq_shift_channels = nullptr;
         }
     }
 
@@ -272,35 +343,70 @@ namespace falcon_dsp
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
+        /* sanity check the input and verify that invoking this method make sense. specifically,
+         *  if a user configured the frequency shifter for multiple channels then this is not
+         *  the right method to call. instead, the user should invoke the method that provides
+         *  multiple output channels */
+        if (m_freq_shift_channels.size() > 1)
+        {
+            return false;
+        }
+        
         /* clear the output data structure and resize so that it can hold the shifted
          *  data. note that by using resize() the vector size is now equal to in.size()
-         *  even without explicitly adding data to the vector */
+         *  even without explicitly adding data to the vector, which means that we can
+         *  add data directly into the vector data buffer without worrying about the
+         *  vector size getting mismatched with the buffer contents */
         out.clear();
         out.resize(in.size());
         
         /* if there is enough space in previously allocated memory then use it; otherwise
-         *  allocate a new memory buffer. it is left as a future feature to specify a maximum
+         *  allocate new memory buffers. it is left as a future feature to specify a maximum
          *  memory size and process the data in chunks instead of requiring enough GPU
          *  memory to process the whole vector at once */
-        if (m_max_num_cuda_input_samples < in.size())
-        {            
-            /* clean up existing memory */
-            if (m_cuda_data_vector != nullptr)
+        
+        /* allocate CUDA memory for the input samples */
+        if (m_max_num_input_samples < in.size())
+        {
+            if (m_cuda_input_data)
             {
-                cudaFree(m_cuda_data_vector);
-                m_cuda_data_vector = nullptr;
+                cudaFree(m_cuda_input_data);
+                m_cuda_input_data = nullptr;
+                m_max_num_input_samples = 0;
             }
             
-            /* allocate CUDA unified memory space for the data to be transformed. */
-            cudaMallocManaged(&m_cuda_data_vector, in.size() * sizeof(std::complex<float>));
-            m_max_num_cuda_input_samples = in.size();
+            cudaMallocManaged(&m_cuda_input_data, in.size() * sizeof(std::complex<float>));
+            m_max_num_input_samples = in.size();
         }
-
-        cuFloatComplex * cuda_data = static_cast<cuFloatComplex *>(m_cuda_data_vector);        
         
-        cudaMemcpy(static_cast<void *>(cuda_data),
+        /* allocate CUDA memory for the output samples. all channels have the same amount
+         *  of output space and at least one channel is guaranteed by the constructor. note
+         *  this output memory is NOT needed if there is only a single output channel; in
+         *  this case the data can be modified in-place on the GPU */
+        if (m_freq_shift_channels.size() > 1 &&
+            m_freq_shift_channels[0]->out_data_len < in.size())
+        {
+            for (auto& chan_iter : m_freq_shift_channels)
+            {
+                /* clean up existing memory */
+                if (chan_iter->out_data)
+                {
+                    cudaFree(chan_iter->out_data);
+                    chan_iter->out_data = nullptr;
+                    chan_iter->out_data_len = 0;
+                }
+                
+                /* allocate CUDA unified memory space for the output data */
+                cudaMallocManaged(&chan_iter->out_data, in.size() * sizeof(std::complex<float>));
+                chan_iter->out_data_len = in.size();
+            }
+        }
+        
+        /* copy the input data to the GPU */
+        cuFloatComplex * cuda_float_complex_input_data = static_cast<cuFloatComplex *>(m_cuda_input_data);        
+        cudaMemcpy(static_cast<void *>(cuda_float_complex_input_data),
                    static_cast<void *>(in.data()),
-                   sizeof(std::complex<float>) * in.size(),
+                   in.size() * sizeof(std::complex<float>),
                    cudaMemcpyHostToDevice);
         
         /* run kernel on the GPU */
@@ -309,27 +415,58 @@ namespace falcon_dsp
         uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
-        __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_samples_handled,
-                                                               m_calculated_rollover_sample_idx,
-                                                               m_angular_freq,
-                                                               num_samples_per_thread,
-                                                               cuda_data,
-                                                               m_max_num_cuda_input_samples,
-                                                               cuda_data, /* modify in place */
-                                                               m_max_num_cuda_input_samples);
+        if (m_freq_shift_channels.size() == 1)
+        {
+            __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_samples_handled,
+                                                                   m_freq_shift_channels[0]->time_shift_rollover_sample_idx,
+                                                                   m_freq_shift_channels[0]->angular_freq,
+                                                                   num_samples_per_thread,
+                                                                   cuda_float_complex_input_data,
+                                                                   m_max_num_input_samples,
+                                                                   cuda_float_complex_input_data, /* modify in place */
+                                                                   m_max_num_input_samples);
         
-        /* wait for GPU to finish before accessing on host */
-        cudaDeviceSynchronize();
+            /* wait for GPU to finish before accessing on host */
+            cudaDeviceSynchronize();
         
-        /* copy output samples out of CUDA memory */
-        cudaMemcpy(static_cast<void *>(out.data()),
-                   static_cast<void *>(cuda_data),
-                   sizeof(std::complex<float>) * in.size(),
-                   cudaMemcpyDeviceToHost);
+            /* copy output samples out of CUDA memory */
+            cudaMemcpy(static_cast<void *>(out.data()),
+                       static_cast<void *>(cuda_float_complex_input_data),
+                       in.size() * sizeof(std::complex<float>),
+                       cudaMemcpyDeviceToHost);
+        }
+        else
+        {
+            __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_samples_handled,
+                                                                   m_freq_shift_channels[0]->time_shift_rollover_sample_idx,
+                                                                   m_freq_shift_channels[0]->angular_freq,
+                                                                   num_samples_per_thread,
+                                                                   cuda_float_complex_input_data,
+                                                                   m_max_num_input_samples,
+                                                                   m_freq_shift_channels[0]->out_data,
+                                                                   m_freq_shift_channels[0]->out_data_len);
         
-        m_samples_handled += in.size();
-        m_samples_handled = static_cast<uint32_t>(m_samples_handled) % m_calculated_rollover_sample_idx;
-            
+            /* wait for GPU to finish before accessing on host */
+            cudaDeviceSynchronize();
+        
+            /* copy output samples out of CUDA memory */
+            cudaMemcpy(static_cast<void *>(out.data()),
+                       static_cast<void *>(m_freq_shift_channels[0]->out_data),
+                       in.size() * sizeof(std::complex<float>),
+                       cudaMemcpyDeviceToHost);
+        }
+        
+        for (auto& chan_iter : m_freq_shift_channels)
+        {
+            chan_iter->num_samples_handled += in.size();
+            chan_iter->num_samples_handled = static_cast<uint32_t>(chan_iter->num_samples_handled) % chan_iter->time_shift_rollover_sample_idx;
+        }
+
         return out.size() > 0;
+    }
+    
+    bool falcon_dsp_freq_shift_cuda::apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out)
+    {
+        return false;
     }
 }

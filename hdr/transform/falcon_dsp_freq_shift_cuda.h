@@ -51,6 +51,7 @@
  *****************************************************************************/
 
 #include <complex>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -68,9 +69,29 @@
 
 struct freq_shift_channel_s
 {
+    freq_shift_channel_s(void)
+      : num_samples_handled(0),
+        time_shift_rollover_sample_idx(1e6),
+        angular_freq(0.0),
+        out_data(nullptr),
+        out_data_len(0)
+    { }
+
+    ~freq_shift_channel_s(void)
+    {
+        if (out_data)
+        {
+            cudaFree(out_data);
+            out_data = nullptr;
+            out_data_len = 0;
+        }
+    }
+
+    uint64_t num_samples_handled;
     uint32_t time_shift_rollover_sample_idx;
     double angular_freq;
     cuFloatComplex * out_data;
+    uint32_t out_data_len;
 };
 
 /******************************************************************************
@@ -111,10 +132,11 @@ namespace falcon_dsp
     /* CUDA kernel function that supports multi-channel frequency shifting. */
     __global__
     void __freq_shift_multi_chan(uint32_t num_samples_handled_previously,
-                                 uint32_t num_channels,
                                  freq_shift_channel_s * channels,
+                                 uint32_t num_channels,
+                                 uint32_t num_samples_to_process_per_thread,
                                  cuFloatComplex * in_data,
-                                 uint32_t num_samples_to_process);
+                                 uint32_t in_data_len);
     
     
     /******************************************************************************
@@ -131,6 +153,8 @@ namespace falcon_dsp
     public:
         
         falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, int32_t freq_shift_in_hz);
+        falcon_dsp_freq_shift_cuda(std::vector<std::pair<uint32_t, int32_t>> shift_channels);
+
         ~falcon_dsp_freq_shift_cuda(void);
         
         falcon_dsp_freq_shift_cuda(void) = delete;
@@ -138,15 +162,17 @@ namespace falcon_dsp
         
         bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out) override;
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+        bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
     
     private:
+
+        /* variables for input data memory management */
+        void *                                                m_cuda_input_data;
+        uint32_t                                              m_max_num_input_samples;
         
-        bool compute_next_kernel_params(int64_t cur_x_idx, size_t in_size,
-                                        uint32_t& num_in_samples, uint32_t& num_threads, uint32_t& new_t);
-        
-        /* variables for CUDA memory management */
-        void * m_cuda_data_vector;
-        uint32_t m_max_num_cuda_input_samples;
+        /* variables for multi-channel management */
+        std::vector<std::unique_ptr<freq_shift_channel_s>>    m_freq_shift_channels;
+        freq_shift_channel_s *                                d_freq_shift_channels;
     };
 }
 

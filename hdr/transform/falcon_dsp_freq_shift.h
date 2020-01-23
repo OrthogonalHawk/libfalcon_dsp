@@ -109,6 +109,8 @@ namespace falcon_dsp
 
     protected:
     
+        static std::pair<uint32_t, float> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
+    
         std::mutex m_mutex;
         double     m_samples_handled;
         uint32_t   m_calculated_rollover_sample_idx;
