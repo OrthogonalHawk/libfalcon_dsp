@@ -52,6 +52,7 @@
 #include <gtest/gtest.h>
 
 #include "transform/falcon_dsp_freq_shift_cuda.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -101,18 +102,15 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
     
     EXPECT_EQ(in_data.size(), expected_out_data.size());
     
-    auto start = std::chrono::high_resolution_clock::now();
+    falcon_dsp::falcon_dsp_host_timer timer;
 
     /* now frequency shift the input and verify that the calculated output
      *  matches the expected output */
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(falcon_dsp::freq_shift_cuda(input_sample_rate_in_sps, in_data,
                                             freq_shift_in_hz, out_data));
-    
-    auto done = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_ms = done - start;
-    
-    std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
+   
+    timer.log_duration("Shifting Complete"); timer.reset();
 
     EXPECT_EQ(in_data.size(), out_data.size());
     
@@ -121,6 +119,8 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
         ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
         ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
     }
+    
+    timer.log_duration("Data Validated");
 }
 
 TEST(falcon_dsp_transform, cuda_freq_shift_001)

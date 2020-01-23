@@ -54,6 +54,7 @@ CC_SOURCES = \
     src/transform/falcon_dsp_fir_filter.cc \
     src/transform/falcon_dsp_iir_filter.cc \
     src/transform/falcon_dsp_polar_discriminator.cc \
+    src/utilities/falcon_dsp_host_timer.cc \
     src/utilities/falcon_dsp_utils.cc \
     
 CUDA_SOURCES = \
