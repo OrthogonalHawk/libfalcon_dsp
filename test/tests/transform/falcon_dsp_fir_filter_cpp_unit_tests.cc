@@ -25,11 +25,11 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_linear_filter_cpp_unit_tests.cc
+ * @file     falcon_dsp_fir_filter_cpp_unit_tests.cc
  * @author   OrthogonalHawk
  * @date     21-Jan-2020
  *
- * @brief    Unit tests that exercise the FALCON DSP linear filtering functions.
+ * @brief    Unit tests that exercise the FALCON DSP FIR filtering functions.
  *
  * @section  DESCRIPTION
  *
@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 21-Jan-2020  OrthogonalHawk  File created.
+ * 22-Jan-2020  OrthogonalHawk  Renamed file to focus on FIR filtering.
  *
  *****************************************************************************/
 
@@ -75,9 +76,9 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void run_cpp_linear_filter_test(std::string input_data_file_name,
-                                std::string input_coeff_file_name,
-                                std::string expected_output_file_name)
+void run_cpp_fir_filter_test(std::string input_data_file_name,
+                             std::string input_coeff_file_name,
+                             std::string expected_output_file_name)
 {
     /* get the input data; only int16_t reading from file is supported at this time so it will need
      *  to be converted to std::complex<float> */
@@ -143,7 +144,7 @@ void run_cpp_linear_filter_test(std::string input_data_file_name,
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_basic_filter_uint16_t_000)
+TEST(falcon_dsp_fir_filter, cpp_basic_filter_uint16_t_000)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -172,7 +173,7 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_uint16_t_000)
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_000)
+TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_000)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -201,7 +202,7 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_000)
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_001)
+TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_001)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -231,7 +232,7 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_001)
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_002)
+TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_002)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -272,7 +273,7 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_002)
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_003)
+TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_003)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -304,16 +305,16 @@ TEST(falcon_dsp_linear_filter, cpp_basic_filter_float_003)
     }
 }
 
-TEST(falcon_dsp_linear_filter, cpp_linear_filter_010)
+TEST(falcon_dsp_fir_filter, cpp_linear_filter_010)
 {
-    run_cpp_linear_filter_test("./vectors/test_010_x.bin",
-                               "./vectors/test_010.filter_coeffs.txt",
-                               "./vectors/test_010_y.bin");
+    run_cpp_fir_filter_test("./vectors/test_010_x.bin",
+                            "./vectors/test_010.filter_coeffs.txt",
+                            "./vectors/test_010_y.bin");
 }
 
-TEST(falcon_dsp_linear_filter, cpp_linear_filter_011)
+TEST(falcon_dsp_fir_filter, cpp_linear_filter_011)
 {
-    run_cpp_linear_filter_test("./vectors/test_011_x.bin",
-                               "./vectors/test_011.filter_coeffs.txt",
-                               "./vectors/test_011_y.bin");
+    run_cpp_fir_filter_test("./vectors/test_011_x.bin",
+                            "./vectors/test_011.filter_coeffs.txt",
+                            "./vectors/test_011_y.bin");
 }
