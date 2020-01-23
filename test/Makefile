@@ -57,6 +57,7 @@ CC_SOURCES = \
     tests/math/falcon_dsp_math_unit_tests.cc \
     tests/resample/falcon_dsp_polyphase_resample_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
+    tests/transform/falcon_dsp_iir_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_linear_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_polar_discriminator_cpp_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
