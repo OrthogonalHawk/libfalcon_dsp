@@ -66,6 +66,13 @@
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
 
+struct freq_shift_channel_s
+{
+    uint32_t time_shift_rollover_sample_idx;
+    double angular_freq;
+    cuFloatComplex * out_data;
+};
+
 /******************************************************************************
  *                                  MACROS
  *****************************************************************************/
@@ -85,8 +92,8 @@ namespace falcon_dsp
      * @return True if the input vector was frequency shifted as requested;
      *          false otherwise.
      */
-    bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
-                         int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out);
+    bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                         int32_t freq_shift_in_hz, std::vector<std::complex<float>>& out);
     
     /* CUDA kernel function that applies a frequency shift and puts the shifted data
      *  into a (new?) memory location. can either be used to modify the data in-place
@@ -95,9 +102,19 @@ namespace falcon_dsp
     void __freq_shift(uint32_t num_samples_handled_previously,
                       uint32_t time_shift_rollover_sample_idx,
                       double angular_freq,
+                      uint32_t num_samples_to_process_per_thread,
                       cuFloatComplex * in_data,
+                      uint32_t in_data_len,
                       cuFloatComplex * out_data,
-                      uint32_t data_size);
+                      uint32_t out_data_len);
+    
+    /* CUDA kernel function that supports multi-channel frequency shifting. */
+    __global__
+    void __freq_shift_multi_chan(uint32_t num_samples_handled_previously,
+                                 uint32_t num_channels,
+                                 freq_shift_channel_s * channels,
+                                 cuFloatComplex * in_data,
+                                 uint32_t num_samples_to_process);
     
     
     /******************************************************************************
@@ -120,6 +137,7 @@ namespace falcon_dsp
         falcon_dsp_freq_shift_cuda(const falcon_dsp_freq_shift_cuda&) = delete;
         
         bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out) override;
+        bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
     
     private:
         

@@ -77,15 +77,27 @@
 void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_output_file_name,
                               uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
 {
-    std::vector<std::complex<int16_t>> in_data;
+    std::vector<std::complex<int16_t>> tmp_in_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
-                                                        falcon_dsp::file_type_e::BINARY, in_data));
+                                                        falcon_dsp::file_type_e::BINARY, tmp_in_data));
+    
+    std::vector<std::complex<float>> in_data;
+    for (auto in_iter : tmp_in_data)
+    {
+        in_data.push_back(std::complex<float>(in_iter.real(), in_iter.imag()));
+    }
+    
     
     std::cout << "Read " << in_data.size() << " samples from " << input_file_name << std::endl;
 
-    std::vector<std::complex<int16_t>> expected_out_data;
+    std::vector<std::complex<int16_t>> tmp_expected_out_data;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(expected_output_file_name,
-                                                        falcon_dsp::file_type_e::BINARY, expected_out_data));
+                                                        falcon_dsp::file_type_e::BINARY, tmp_expected_out_data));
+    std::vector<std::complex<float>> expected_out_data;
+    for (auto out_iter : tmp_expected_out_data)
+    {
+        expected_out_data.push_back(std::complex<float>(out_iter.real(), out_iter.imag()));
+    }
     
     EXPECT_EQ(in_data.size(), expected_out_data.size());
     
@@ -93,7 +105,7 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
 
     /* now frequency shift the input and verify that the calculated output
      *  matches the expected output */
-    std::vector<std::complex<int16_t>> out_data;
+    std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(falcon_dsp::freq_shift_cuda(input_sample_rate_in_sps, in_data,
                                             freq_shift_in_hz, out_data));
     
