@@ -398,9 +398,8 @@ namespace falcon_dsp
          *  of output space and at least one channel is guaranteed by the constructor. note
          *  this output memory is NOT needed if there is only a single output channel; in
          *  this case the data can be modified in-place on the GPU */
-        //if (m_freq_shift_channels.size() > 1 &&
-        //    m_freq_shift_channels[0]->out_data_len < in.size())
-        if (m_freq_shift_channels[0]->out_data_len < in.size())
+        if (m_freq_shift_channels.size() > 1 &&
+            m_freq_shift_channels[0]->out_data_len < in.size())
         {
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
             {
@@ -431,7 +430,7 @@ namespace falcon_dsp
         uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
-        if (m_freq_shift_channels.size() == 1 && false)
+        if (m_freq_shift_channels.size() == 1)
         {
             __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
                                                                    m_freq_shift_channels[0]->time_shift_rollover_sample_idx,
@@ -460,8 +459,6 @@ namespace falcon_dsp
                            static_cast<void *>(m_freq_shift_channels[chan_idx].get()),
                            sizeof(freq_shift_channel_s),
                            cudaMemcpyHostToDevice);
-                
-                //d_freq_shift_channels[chan_idx] = *m_freq_shift_channels[chan_idx];
             }   
 
             __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
