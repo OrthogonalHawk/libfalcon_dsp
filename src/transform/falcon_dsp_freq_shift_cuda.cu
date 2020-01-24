@@ -202,8 +202,7 @@ namespace falcon_dsp
     
     /* CUDA kernel function that supports multi-channel frequency shifting. */
     __global__
-    void __freq_shift_multi_chan(uint32_t num_samples_handled_previously,
-                                 freq_shift_channel_s * channels,
+    void __freq_shift_multi_chan(freq_shift_channel_s * channels,
                                  uint32_t num_channels,
                                  uint32_t num_samples_to_process_per_thread,
                                  cuFloatComplex * in_data,
@@ -256,10 +255,8 @@ namespace falcon_dsp
         {
             local_num_samples_to_process = in_data_len - start_data_index;
         }
-        
-        /* compute the time shift index for the current thread */
-        uint64_t time_shift_idx = num_samples_handled_previously + start_data_index;
-        
+
+        uint64_t time_shift_idx = 0;
         float freq_shift_angle = 0.;
         float freq_shift_real = 0.;
         float freq_shift_imag = 0.;
@@ -287,7 +284,7 @@ namespace falcon_dsp
             {
                 next_input_sample = local_inputs[sample_idx];
 
-                time_shift_idx = num_samples_handled_previously + start_data_index + sample_idx;
+                time_shift_idx = s_channels[chan_idx].num_samples_handled + start_data_index + sample_idx;
                 time_shift_idx %= s_channels[chan_idx].time_shift_rollover_sample_idx;
             
                 /* compute the frequency shift multiplier value */
@@ -521,7 +518,6 @@ namespace falcon_dsp
             }
 
             __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size, shared_memory_size_in_bytes>>>(
-                    m_freq_shift_channels[0]->num_samples_handled,
                     d_freq_shift_channels,
                     m_freq_shift_channels.size(),
                     num_samples_per_thread,
