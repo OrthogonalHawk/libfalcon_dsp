@@ -54,6 +54,7 @@
 #include <gtest/gtest.h>
 
 #include "transform/falcon_dsp_freq_shift.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -91,7 +92,7 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
     
     EXPECT_EQ(in_data.size(), expected_out_data.size());
     
-    auto start = std::chrono::high_resolution_clock::now();
+    falcon_dsp::falcon_dsp_host_timer timer;
     
     /* now frequency shift the input and verify that the calculated output
      *  matches the expected output */
@@ -99,10 +100,7 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
     EXPECT_TRUE(falcon_dsp::freq_shift(input_sample_rate_in_sps, in_data,
                 freq_shift_in_hz, out_data));
     
-    auto done = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_ms = done - start;
-    
-    std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
+    timer.log_duration("Shifting Complete"); timer.reset();
     
     EXPECT_EQ(in_data.size(), out_data.size());
     
@@ -120,12 +118,14 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
             max_imag_diff = 10;
         }
         
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
     }
+    
+    timer.log_duration("Data Validated");
 }
 
-TEST(falcon_dsp_transform, cpp_freq_shift_001)
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_001)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_001_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_001_y.bin";
@@ -138,7 +138,7 @@ TEST(falcon_dsp_transform, cpp_freq_shift_001)
                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_transform, cpp_freq_shift_002)
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_002)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_002_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_002_y.bin";
@@ -151,7 +151,7 @@ TEST(falcon_dsp_transform, cpp_freq_shift_002)
                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_transform, cpp_freq_shift_003)
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_003)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_003_x.bin";
     std::string OUT_TEST_FILE_NAME = "vectors/test_003_y.bin";

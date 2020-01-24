@@ -232,7 +232,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_003)
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
-TEST(falcon_dsp_freq_shift, cuda_freq_shift_012)
+TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_012)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
     std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_012_y_shift_";
@@ -247,7 +247,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_012)
                                         freq_shifts);
 }
 
-TEST(falcon_dsp_freq_shift, cuda_freq_shift_013)
+TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_013)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_013_x.bin";
     std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_013_y_shift_";
@@ -262,7 +262,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_013)
                                         freq_shifts);
 }
 
-TEST(falcon_dsp_freq_shift, cuda_freq_shift_014)
+TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_014)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_014_x.bin";
     std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_014_y_shift_";
