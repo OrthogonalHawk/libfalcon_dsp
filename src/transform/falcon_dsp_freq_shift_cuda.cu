@@ -61,6 +61,14 @@
 const uint32_t DUMMY_SAMPLE_RATE_IN_SPS = 1e6;
 const float DUMMY_FREQ_SHIFT_IN_HZ = 0.0;
 
+/* setting this value based on empirical tests. setting to 4 makes some sense as
+ *  well based on the CUDA memory management. each cuFloatComplex is 8 bytes, which
+ *  means that four of them can be retrieved in a 32-byte transaction. increasing
+ *  the size to 8 made the performance worse, presumably due to the decreased
+ *  number of threads/thread blocks that were required to process the same amount
+ *  of data. */
+const uint32_t MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_KERNEL = 4;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -213,6 +221,11 @@ namespace falcon_dsp
         __syncthreads();
         
         /* sanity check the inputs */
+        if (num_samples_to_process_per_thread > MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_KERNEL)
+        {
+            return;
+        }
+        
         for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
         {
             /* catch the case where the channel information is not available or where
@@ -251,15 +264,27 @@ namespace falcon_dsp
         cuFloatComplex freq_shift;
         cuFloatComplex next_input_sample;
         
+        cuFloatComplex local_inputs[MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_KERNEL];
+        
+        /* retrieve the input samples that this kernel needs */
         for (uint32_t sample_idx = 0;
              sample_idx < local_num_samples_to_process &&
                  (start_data_index + sample_idx) < in_data_len;
              ++sample_idx)
         {
-            next_input_sample = in_data[start_data_index + sample_idx];
-            
-            for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
+            local_inputs[sample_idx] = in_data[start_data_index + sample_idx];
+        }
+        
+        /* now compute outputs for each channel */
+        for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
+        {
+            for (uint32_t sample_idx = 0;
+                 sample_idx < local_num_samples_to_process &&
+                     (start_data_index + sample_idx) < in_data_len;
+                 ++sample_idx)
             {
+                next_input_sample = local_inputs[sample_idx];
+
                 time_shift_idx = num_samples_handled_previously + start_data_index + sample_idx;
                 time_shift_idx %= s_channels[chan_idx].time_shift_rollover_sample_idx;
             
