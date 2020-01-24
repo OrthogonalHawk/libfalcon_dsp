@@ -199,27 +199,34 @@ namespace falcon_dsp
                                  cuFloatComplex * in_data,
                                  uint32_t in_data_len)
     {
+        extern __shared__ freq_shift_channel_s s_channels[];
+        
         /* retrieve the starting data index that corresponds to this thread */
         uint32_t start_data_index = blockIdx.x * blockDim.x * num_samples_to_process_per_thread +
                                         threadIdx.x * num_samples_to_process_per_thread;
      
-        /* catch the case where the channel information is not available or where
-         *  the output buffer is shorter than the input buffer */
+        /* copy channel information into shared memory */
+        if (threadIdx.x < num_channels)
+        {
+            s_channels[threadIdx.x] = channels[threadIdx.x];
+        }
+        __syncthreads();
+        
+        /* sanity check the inputs */
         for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
         {
-            if (channels[chan_idx].out_data == nullptr ||
-                channels[chan_idx].out_data_len < in_data_len)
+            /* catch the case where the channel information is not available or where
+             *  the output buffer is shorter than the input buffer */
+            if (s_channels[chan_idx].out_data == nullptr ||
+                s_channels[chan_idx].out_data_len < in_data_len)
             {               
                 return;
             }
-        }
-        
-        /* catch the case where the input size is not an integer
-         *  multiple of the thread block size */
-        for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
-        {
+            
+            /* catch the case where the input size is not an integer
+             *  multiple of the thread block size */
             if (start_data_index > in_data_len ||
-                start_data_index > channels[chan_idx].out_data_len)
+                start_data_index > s_channels[chan_idx].out_data_len)
             {
                 return;
             }
@@ -254,10 +261,10 @@ namespace falcon_dsp
             for (uint32_t chan_idx = 0; chan_idx < num_channels; ++chan_idx)
             {
                 time_shift_idx = num_samples_handled_previously + start_data_index + sample_idx;
-                time_shift_idx %= channels[chan_idx].time_shift_rollover_sample_idx;
+                time_shift_idx %= s_channels[chan_idx].time_shift_rollover_sample_idx;
             
                 /* compute the frequency shift multiplier value */
-                freq_shift_angle = channels[chan_idx].angular_freq * time_shift_idx;
+                freq_shift_angle = s_channels[chan_idx].angular_freq * time_shift_idx;
                 freq_shift_real = cosf(freq_shift_angle);
                 freq_shift_imag = sinf(freq_shift_angle);
             
@@ -267,7 +274,7 @@ namespace falcon_dsp
 
                 /* apply the frequency shift; may be used to modify data in place or to put
                  *  the output into a new vector based on the input arguments */
-                channels[chan_idx].out_data[start_data_index + sample_idx] = cuCmulf(next_input_sample, freq_shift);
+                s_channels[chan_idx].out_data[start_data_index + sample_idx] = cuCmulf(next_input_sample, freq_shift);
             }
         }
     }
@@ -474,7 +481,9 @@ namespace falcon_dsp
                        cudaMemcpyDeviceToHost);
         }
         else /* use the multi-channel kernel */
-        {            
+        {
+            uint32_t shared_memory_size_in_bytes = sizeof(freq_shift_channel_s) * m_freq_shift_channels.size();
+            
             /* copy the channel information to the GPU */
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
             {
@@ -484,12 +493,13 @@ namespace falcon_dsp
                            cudaMemcpyHostToDevice);
             }
 
-            __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
-                                                                              d_freq_shift_channels,
-                                                                              m_freq_shift_channels.size(),
-                                                                              num_samples_per_thread,
-                                                                              cuda_float_complex_input_data,
-                                                                              m_max_num_input_samples);
+            __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size, shared_memory_size_in_bytes>>>(
+                    m_freq_shift_channels[0]->num_samples_handled,
+                    d_freq_shift_channels,
+                    m_freq_shift_channels.size(),
+                    num_samples_per_thread,
+                    cuda_float_complex_input_data,
+                    m_max_num_input_samples);
             
             /* wait for GPU to finish before accessing on host */
             cudaDeviceSynchronize();
