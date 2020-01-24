@@ -78,7 +78,10 @@ namespace falcon_dsp
     {
     public:
     
-        falcon_dsp_host_timer(std::string timer_name = "TIMER");
+        falcon_dsp_host_timer(void);
+        falcon_dsp_host_timer(std::string timer_name);
+        falcon_dsp_host_timer(std::string timer_name, bool logging_enabled);
+        
         ~falcon_dsp_host_timer(void);
     
         falcon_dsp_host_timer(const falcon_dsp_host_timer&) = delete;
@@ -99,6 +102,7 @@ namespace falcon_dsp
     
         std::mutex                                         m_mutex;
         std::string                                        m_timer_name;
+        bool                                               m_logging_enabled;
         bool                                               m_running;
         std::chrono::high_resolution_clock::time_point     m_start;
         std::chrono::high_resolution_clock::time_point     m_stop;

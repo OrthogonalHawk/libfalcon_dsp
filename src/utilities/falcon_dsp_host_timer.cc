@@ -73,11 +73,25 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_host_timer::falcon_dsp_host_timer(std::string timer_name)
-      : m_timer_name(timer_name),
+    falcon_dsp_host_timer::falcon_dsp_host_timer(void)
+      : m_timer_name("TIMER"),
+        m_logging_enabled(true),
         m_running(true)
     {
         m_start = std::chrono::high_resolution_clock::now();
+    }
+    
+    falcon_dsp_host_timer::falcon_dsp_host_timer(std::string timer_name)
+      : falcon_dsp_host_timer()
+    {
+        m_timer_name = timer_name;
+    }
+    
+    falcon_dsp_host_timer::falcon_dsp_host_timer(std::string timer_name, bool logging_enabled)
+      : falcon_dsp_host_timer()
+    { 
+        m_timer_name = timer_name;
+        m_logging_enabled = logging_enabled;
     }
     
     falcon_dsp_host_timer::~falcon_dsp_host_timer(void)
@@ -108,7 +122,10 @@ namespace falcon_dsp
             duration_ms = m_stop - m_start;
         }
         
-        std::cout << "[" << m_timer_name << "] Event: " << message << " Elapsed ms: " << duration_ms.count() << std::endl;
+        if (m_logging_enabled)
+        {
+            std::cout << "[" << m_timer_name << "] Event: " << message << " Elapsed ms: " << duration_ms.count() << std::endl;
+        }
     }
         
     /* resets the timer start time to now */

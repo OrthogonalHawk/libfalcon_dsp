@@ -138,6 +138,7 @@ export NUM_TONES=2
 export INPUT_SAMPLE_RATE=1000000
 export NUM_OUTPUT_SAMPLES=1000000
 export OUT_FILE_NAME=../vectors/test_012
+export SEED=3758
 
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_chan_freq_shift_test_vectors.ipynb --output tmp_notebooks/generate_multi_chan_freq_shift_test_vectors_012.ipynb
 
@@ -147,6 +148,7 @@ export NUM_TONES=5
 export INPUT_SAMPLE_RATE=1000000
 export NUM_OUTPUT_SAMPLES=1000000
 export OUT_FILE_NAME=../vectors/test_013
+export SEED=6277
 
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_chan_freq_shift_test_vectors.ipynb --output tmp_notebooks/generate_multi_chan_freq_shift_test_vectors_013.ipynb
 
@@ -156,6 +158,7 @@ export NUM_TONES=10
 export INPUT_SAMPLE_RATE=1000000
 export NUM_OUTPUT_SAMPLES=1000000
 export OUT_FILE_NAME=../vectors/test_014
+export SEED=3999
 
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_chan_freq_shift_test_vectors.ipynb --output tmp_notebooks/generate_multi_chan_freq_shift_test_vectors_014.ipynb
 

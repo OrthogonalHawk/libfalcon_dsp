@@ -239,7 +239,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_012)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { 384542, 231537 };
+    std::vector<int32_t> freq_shifts = { -281375, 79297 };
     
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
@@ -254,7 +254,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_013)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { 391161, 82361, 82551, 498264, 50064 };
+    std::vector<int32_t> freq_shifts = { 57982, 239457, 426534, 499857, 463877 };
     
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
@@ -269,7 +269,7 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_014)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { -8714, 21372, 142322, 106855, 163457, 168369, 205071, 90407, 65064, 120679 };
+    std::vector<int32_t> freq_shifts = { -141451, 307008, 54623, 445497, 71758, 141718, 114510, 162143, 78135, 118135 };
     
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,

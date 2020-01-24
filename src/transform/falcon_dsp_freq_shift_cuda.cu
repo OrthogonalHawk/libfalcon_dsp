@@ -58,6 +58,8 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
+const bool TIMING_LOGS_ENABLED = false;
+
 const uint32_t DUMMY_SAMPLE_RATE_IN_SPS = 1e6;
 const float DUMMY_FREQ_SHIFT_IN_HZ = 0.0;
 
@@ -482,7 +484,7 @@ namespace falcon_dsp
         uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
-        falcon_dsp::falcon_dsp_host_timer timer("KERNEL");
+        falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_LOGS_ENABLED);
         if (m_freq_shift_channels.size() == 1)
         {
             __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
