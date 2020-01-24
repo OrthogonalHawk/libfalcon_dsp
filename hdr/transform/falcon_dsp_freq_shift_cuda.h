@@ -116,6 +116,19 @@ namespace falcon_dsp
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                          int32_t freq_shift_in_hz, std::vector<std::complex<float>>& out);
     
+    /* @brief CUDA implementation of a multi-channel frequency shift vector operation.
+     * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
+     *                                      per second.
+     * @param[in] in                    - input vector
+     * @param[in] freq_shift_in_hz      - vector of requested frequency shifts; each shift value
+     *                                     generates a separate output 'channel'
+     * @param[out] out                  - vector of frequency shifted vectors
+     * @return True if the input vector was frequency shifted as requested;
+     *          false otherwise.
+     */
+    bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                         std::vector<int32_t>& freq_shift_in_hz, std::vector<std::vector<std::complex<float>>>& out);
+    
     /* CUDA kernel function that applies a frequency shift and puts the shifted data
      *  into a (new?) memory location. can either be used to modify the data in-place
      *  or to make a new vector with the shifted data. */
@@ -153,7 +166,7 @@ namespace falcon_dsp
     public:
         
         falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, int32_t freq_shift_in_hz);
-        falcon_dsp_freq_shift_cuda(std::vector<std::pair<uint32_t, int32_t>> shift_channels);
+        falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz);
 
         ~falcon_dsp_freq_shift_cuda(void);
         

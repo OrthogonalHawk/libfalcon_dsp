@@ -48,9 +48,11 @@
  *****************************************************************************/
 
 #include <iostream>
+#include <memory>
 #include <stdint.h>
 
 #include "transform/falcon_dsp_freq_shift_cuda.h"
+#include "utilities/falcon_dsp_host_timer.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -92,6 +94,23 @@ namespace falcon_dsp
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                          int32_t freq_shift_in_hz, std::vector<std::complex<float>>& out)
     {        
+        falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
+        return freq_shifter.apply(in, out);
+    }
+    
+    /* @brief CUDA implementation of a multi-channel frequency shift vector operation.
+     * @param[in] in_sample_rate_in_sps - input vector sample rate in samples
+     *                                      per second.
+     * @param[in] in                    - input vector
+     * @param[in] freq_shift_in_hz      - vector of requested frequency shifts; each shift value
+     *                                     generates a separate output 'channel'
+     * @param[out] out                  - vector of frequency shifted vectors
+     * @return True if the input vector was frequency shifted as requested;
+     *          false otherwise.
+     */
+    bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                         std::vector<int32_t>& freq_shift_in_hz, std::vector<std::vector<std::complex<float>>>& out)
+    {
         falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
         return freq_shifter.apply(in, out);
     }
@@ -275,15 +294,15 @@ namespace falcon_dsp
         cudaMallocManaged(&d_freq_shift_channels, m_freq_shift_channels.size() * sizeof(freq_shift_channel_s));
     }
 
-    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(std::vector<std::pair<uint32_t, int32_t>> shift_channels)
+    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz)
       : falcon_dsp_freq_shift(DUMMY_SAMPLE_RATE_IN_SPS, DUMMY_FREQ_SHIFT_IN_HZ),
         m_cuda_input_data(nullptr),
         m_max_num_input_samples(0)
     {
         /* user is requesting multiple channels */
-        for (auto chan_iter : shift_channels)
+        for (auto freq_shift : freq_shift_in_hz)
         {
-            auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(chan_iter.first, chan_iter.second);
+            auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate, freq_shift);
             std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
             new_chan->time_shift_rollover_sample_idx = chan_params.first;
             new_chan->angular_freq = chan_params.second;
@@ -431,6 +450,7 @@ namespace falcon_dsp
         uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
+        falcon_dsp::falcon_dsp_host_timer timer("KERNEL");
         if (m_freq_shift_channels.size() == 1)
         {
             __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
@@ -444,6 +464,8 @@ namespace falcon_dsp
         
             /* wait for GPU to finish before accessing on host */
             cudaDeviceSynchronize();
+            
+            timer.log_duration("Single Chan Kernel Complete");
         
             /* copy output samples out of CUDA memory */
             cudaMemcpy(static_cast<void *>(out[0].data()),
@@ -460,7 +482,7 @@ namespace falcon_dsp
                            static_cast<void *>(m_freq_shift_channels[chan_idx].get()),
                            sizeof(freq_shift_channel_s),
                            cudaMemcpyHostToDevice);
-            }   
+            }
 
             __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
                                                                               d_freq_shift_channels,
@@ -468,9 +490,11 @@ namespace falcon_dsp
                                                                               num_samples_per_thread,
                                                                               cuda_float_complex_input_data,
                                                                               m_max_num_input_samples);
-
+            
             /* wait for GPU to finish before accessing on host */
             cudaDeviceSynchronize();
+            
+            timer.log_duration("Multi Chan Kernel Complete");
 
             /* copy output samples out of CUDA memory */
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)

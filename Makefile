@@ -81,4 +81,4 @@ INC_PATH += \
     -I./hdr/math \
     -I./hdr/resample
     
-NVCCFLAGS += $(INC_PATH) -std=c++11 -O3
+NVCCFLAGS += $(INC_PATH)
