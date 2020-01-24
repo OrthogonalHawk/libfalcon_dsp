@@ -359,6 +359,7 @@ namespace falcon_dsp
         return ret;
     }
     
+    
     bool falcon_dsp_freq_shift_cuda::apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
