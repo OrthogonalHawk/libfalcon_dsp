@@ -193,6 +193,99 @@ void run_cuda_multi_chan_freq_shift_test(std::string input_file_name,
     timer.log_duration("Data Validated");
 }
 
+void run_cuda_multi_chan_freq_shift_by_segment_test(std::string input_file_name,
+                                                    std::string expected_output_file_base_name,
+                                                    uint32_t input_sample_rate_in_sps,
+                                                    std::vector<int32_t> freq_shift_channels,
+                                                    uint32_t segment_size_in_samples)
+{
+    /* read the input data from file and convert to std::complex<float> */
+    std::vector<std::complex<int16_t>> tmp_in_data;
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_file_name,
+                                                        falcon_dsp::file_type_e::BINARY, tmp_in_data));
+    
+    std::vector<std::complex<float>> in_data;
+    for (auto in_iter : tmp_in_data)
+    {
+        in_data.push_back(std::complex<float>(in_iter.real(), in_iter.imag()));
+    }
+    std::cout << "Read " << in_data.size() << " samples from " << input_file_name << std::endl;
+
+    
+    /* read in the expected output data file(s) */
+    std::vector<std::vector<std::complex<float>>> expected_out_data;
+    for (auto freq_shift : freq_shift_channels)
+    {
+        std::stringstream ss;
+        ss << expected_output_file_base_name << freq_shift << "_hz.bin";
+        
+        std::cout << "Reading expected output data from " << ss.str() << std::endl;
+        
+        std::vector<std::complex<int16_t>> tmp_expected_out_data;
+        EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(ss.str(),
+                                                            falcon_dsp::file_type_e::BINARY, tmp_expected_out_data));
+        std::vector<std::complex<float>> expected_out_chan_data;
+        for (auto out_iter : tmp_expected_out_data)
+        {
+            expected_out_chan_data.push_back(std::complex<float>(out_iter.real(), out_iter.imag()));
+        }
+        
+        EXPECT_EQ(in_data.size(), expected_out_chan_data.size());
+        expected_out_data.push_back(expected_out_chan_data);
+    }
+    
+
+    /* now frequency shift the input in multiple segments and verify that the combined
+     *  calculated output matches the expected output */
+    falcon_dsp::falcon_dsp_freq_shift_cuda shifter(input_sample_rate_in_sps, freq_shift_channels);
+    std::vector<std::vector<std::complex<float>>> out_data;
+    out_data.resize(freq_shift_channels.size());
+    
+    falcon_dsp::falcon_dsp_host_timer timer;
+    for (uint32_t segment_start_idx = 0; segment_start_idx < in_data.size(); segment_start_idx += segment_size_in_samples)
+    {
+        std::vector<std::complex<float>> segment_in;
+        for (uint32_t in_sample_idx = segment_start_idx;
+             in_sample_idx < (segment_start_idx + segment_size_in_samples) && in_sample_idx < in_data.size();
+             ++in_sample_idx)
+        {
+            segment_in.push_back(in_data[in_sample_idx]);   
+        }
+
+        std::vector<std::vector<std::complex<float>>> segment_out_data;
+        EXPECT_TRUE(shifter.apply(segment_in, segment_out_data));
+        
+        for (uint32_t out_vec_idx = 0; out_vec_idx < segment_out_data.size(); ++out_vec_idx)
+        {
+            for (uint32_t out_sample_idx = 0; out_sample_idx < segment_out_data[out_vec_idx].size(); ++out_sample_idx)
+            {
+                out_data[out_vec_idx].push_back(segment_out_data[out_vec_idx][out_sample_idx]);
+            }
+        }
+    }
+   
+    timer.log_duration("Shifting Complete"); timer.reset();
+
+    for (auto out_iter : out_data)
+    {
+        EXPECT_EQ(in_data.size(), out_iter.size());
+    }
+    
+    for (uint32_t out_idx = 0; out_idx < expected_out_data.size() && out_idx < out_data.size(); ++out_idx)
+    {
+        for (uint32_t ii = 0; ii < in_data.size() && ii < expected_out_data[out_idx].size(); ++ii)
+        {
+            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), expected_out_data[out_idx][ii].real(),
+                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+            
+            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), expected_out_data[out_idx][ii].imag(),
+                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+        }
+    }
+    
+    timer.log_duration("Data Validated");
+}
+
 TEST(falcon_dsp_freq_shift, cuda_freq_shift_001)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_001_x.bin";
@@ -275,4 +368,20 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_014)
                                         OUT_TEST_FILE_BASE_NAME,
                                         INPUT_SAMPLE_RATE_IN_SPS,
                                         freq_shifts);
+}
+
+TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_by_segment_014)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_014_x.bin";
+    std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_014_y_shift_";
+    const uint32_t SEGMENT_SIZE_IN_SAMPLES = 250000 * 5;
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    std::vector<int32_t> freq_shifts = { -141451, 307008, 54623, 445497, 71758, 141718, 114510, 162143, 78135, 118135 };
+    
+    run_cuda_multi_chan_freq_shift_by_segment_test(IN_TEST_FILE_NAME,
+                                                   OUT_TEST_FILE_BASE_NAME,
+                                                   INPUT_SAMPLE_RATE_IN_SPS,
+                                                   freq_shifts, SEGMENT_SIZE_IN_SAMPLES);
 }
