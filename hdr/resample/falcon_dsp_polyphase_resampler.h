@@ -136,6 +136,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace falcon_dsp
 {
+    /******************************************************************************
+     *                            CLASS DECLARATION
+     *****************************************************************************/
+ 
     /* @brief C++ implementation of a polyphase resampler
      */
     template<class T, class C>
@@ -179,9 +183,5 @@ namespace falcon_dsp
     template<>
     int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
-
-/******************************************************************************
- *                            CLASS DECLARATION
- *****************************************************************************/
 
 #endif // __FALCON_DSP_POLYPHASE_RESAMPLER_H__

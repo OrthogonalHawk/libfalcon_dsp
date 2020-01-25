@@ -65,12 +65,12 @@
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                           FUNCTION DECLARATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
+    /******************************************************************************
+     *                           FUNCTION DECLARATION
+     *****************************************************************************/
+ 
     /* @brief Generic resampling operation.
      * @param[in] in_sample_rate_in_sps  - input vector sample rate in samples
      *                                      per second.
@@ -93,10 +93,10 @@ namespace falcon_dsp
     bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                  std::vector<float>& filter_coeffs,
                  uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out);
+    
+    /******************************************************************************
+     *                            CLASS DECLARATION
+     *****************************************************************************/
 }
-
-/******************************************************************************
- *                            CLASS DECLARATION
- *****************************************************************************/
 
 #endif // __FALCON_DSP_RESAMPLER_H__

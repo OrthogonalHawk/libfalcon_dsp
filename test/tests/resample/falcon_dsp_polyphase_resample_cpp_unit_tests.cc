@@ -56,6 +56,7 @@
 #include <gtest/gtest.h>
 
 #include "resample/falcon_dsp_resample.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -125,7 +126,7 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
     uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
     std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
     
-    auto start = std::chrono::high_resolution_clock::now();
+    falcon_dsp::falcon_dsp_host_timer timer;
     
     /* now resample the input and verify that the calculated output
      *  matches the expected output */
@@ -133,10 +134,8 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
     EXPECT_TRUE(falcon_dsp::resample(input_sample_rate_in_sps, in_data, filter_coeffs,
                                      output_sample_rate_in_sps, out_data));
     
-    auto done = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_ms = done - start;
+    timer.log_duration("Filtering Complete"); timer.reset();
     
-    std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
     std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     EXPECT_TRUE(filter_delay < expected_out_data.size());
     EXPECT_TRUE(expected_out_data.size() >= out_data.size());
@@ -159,6 +158,8 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
         EXPECT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
         EXPECT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
     }
+    
+    timer.log_duration("Data Validated");
 }
 
 TEST(falcon_dsp_resample, cpp_resample_004)

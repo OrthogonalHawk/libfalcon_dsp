@@ -137,7 +137,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 namespace falcon_dsp
-{    
+{
+    /******************************************************************************
+     *                            CLASS DECLARATION
+     *****************************************************************************/
+ 
     /* @brief CUDA implementation of a polyphase resampler
      * @description Derives from the C++ version since there is significant overlap
      *               in implementation. CUDA vs. C++ differentiation in the 'apply'
@@ -182,9 +186,5 @@ namespace falcon_dsp
     template <>
     int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
-
-/******************************************************************************
- *                            CLASS DECLARATION
- *****************************************************************************/
 
 #endif // __FALCON_DSP_POLYPHASE_RESAMPLER_CUDA_H__
