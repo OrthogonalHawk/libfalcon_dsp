@@ -40,6 +40,7 @@
  *
  * 20-Jan-2020  OrthogonalHawk  File created.
  * 22-Jan-2020  OrthogonalHawk  Renamed to focus on FIR filtering.
+ * 24-Jan-2020  OrthogonalHawk  Added protected function for state management.
  *
  *****************************************************************************/
 
@@ -203,9 +204,17 @@ namespace falcon_dsp
             }
         }
         
-        /* finished handling the current data; now update the state array. note that the state array
-         *  is populated in such a way that the last sample in the state buffer is the sample
-         *  that is expected to immediately preceed the next sample.
+        /* finished handling the current data; now update the state array */
+        _update_state(in);
+        
+        return out.size() > 0;
+    }
+    
+    void falcon_dsp_fir_filter::_update_state(std::vector<std::complex<float>>& in)
+    {
+        /* note that the state array is populated in such a way that the last sample
+         *  in the state buffer is the sample that is expected to immediately precede
+         *  the next sample.
          *
          * Example:
          *   Data:   x1, x2, x3, x4, x5, x6, x7, x8
@@ -240,7 +249,5 @@ namespace falcon_dsp
                 m_state.erase(m_state.begin(), m_state.begin() + num_elements_to_erase);
             }
         }
-        
-        return out.size() > 0;
     }
 }

@@ -25,9 +25,9 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_fir_filter_cpp_unit_tests.cc
+ * @file     falcon_dsp_fir_filter_cuda_unit_tests.cu
  * @author   OrthogonalHawk
- * @date     21-Jan-2020
+ * @date     24-Jan-2020
  *
  * @brief    Unit tests that exercise the FALCON DSP FIR filtering functions.
  *
@@ -38,8 +38,7 @@
  *
  * @section  HISTORY
  *
- * 21-Jan-2020  OrthogonalHawk  File created.
- * 22-Jan-2020  OrthogonalHawk  Renamed file to focus on FIR filtering.
+ * 24-Jan-2020  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
@@ -53,7 +52,7 @@
 
 #include <gtest/gtest.h>
 
-#include "transform/falcon_dsp_fir_filter.h"
+#include "transform/falcon_dsp_fir_filter_cuda.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
@@ -77,9 +76,9 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void run_cpp_fir_filter_test(std::string input_data_file_name,
-                             std::string input_coeff_file_name,
-                             std::string expected_output_file_name)
+void run_cuda_fir_filter_test(std::string input_data_file_name,
+                              std::string input_coeff_file_name,
+                              std::string expected_output_file_name)
 {
     /* get the input data; only int16_t reading from file is supported at this time so it will need
      *  to be converted to std::complex<float> */
@@ -117,7 +116,7 @@ void run_cpp_fir_filter_test(std::string input_data_file_name,
     /* now filter the input and verify that the calculated output
      *  matches the expected output */
     std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(falcon_dsp::fir_filter(coeffs, in_data, out_data));
+    EXPECT_TRUE(falcon_dsp::fir_filter_cuda(coeffs, in_data, out_data));
     
     timer.log_duration("Filtering Complete"); timer.reset();
     
@@ -144,7 +143,7 @@ void run_cpp_fir_filter_test(std::string input_data_file_name,
     timer.log_duration("Data Validated");
 }
 
-TEST(falcon_dsp_fir_filter, cpp_basic_filter_uint16_t_000)
+TEST(falcon_dsp_fir_filter, cuda_basic_filter_uint16_t_000)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -162,7 +161,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_uint16_t_000)
     std::vector<std::complex<int16_t>> out_data;
     std::vector<std::complex<int16_t>> expected_out_data = { {0, 0}, {2, 0}, {6, 0} };
     
-    falcon_dsp::falcon_dsp_fir_filter filter_obj(coeffs);
+    falcon_dsp::falcon_dsp_fir_filter_cuda filter_obj(coeffs);
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -173,7 +172,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_uint16_t_000)
     }
 }
 
-TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_000)
+TEST(falcon_dsp_fir_filter, cuda_basic_filter_float_000)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -191,7 +190,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_000)
     std::vector<std::complex<float>> out_data;
     std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {2.5, 0.0}, {6.5, 0.0} };
     
-    falcon_dsp::falcon_dsp_fir_filter filter_obj(coeffs);
+    falcon_dsp::falcon_dsp_fir_filter_cuda filter_obj(coeffs);
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -202,7 +201,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_000)
     }
 }
 
-TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_001)
+TEST(falcon_dsp_fir_filter, cuda_basic_filter_float_001)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -221,7 +220,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_001)
     std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {2.5, 0.0}, {6.5, 0.0}, {6.5, 0.0},
                                                            {6.5, 0.0}, {6.5, 0.0}, {6.5, 0.0}, {6.5, 0.0} };
     
-    falcon_dsp::falcon_dsp_fir_filter filter_obj(coeffs);
+    falcon_dsp::falcon_dsp_fir_filter_cuda filter_obj(coeffs);
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -232,7 +231,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_001)
     }
 }
 
-TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_002)
+TEST(falcon_dsp_fir_filter, cuda_basic_filter_float_002)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -251,7 +250,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_002)
     std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {2.5, 0.0}, {6.5, 0.0}, {6.5, 0.0},
                                                            {6.5, 0.0}, {6.5, 0.0}, {6.5, 0.0}, {6.5, 0.0} };
     
-    falcon_dsp::falcon_dsp_fir_filter filter_obj(coeffs);
+    falcon_dsp::falcon_dsp_fir_filter_cuda filter_obj(coeffs);
     
     /* pass in each input value separately to verify that the filter object
      *  maintains state correctly */
@@ -273,7 +272,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_002)
     }
 }
 
-TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_003)
+TEST(falcon_dsp_fir_filter, cuda_basic_filter_float_003)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -294,7 +293,7 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_003)
                                                             {9.0, 0.0}, {13.0, 0.0}, {14.5, 0.0}, {20.5, 0.0},
                                                            {32.5, 0.0}, {30.5, 0.0}, {22.5, 0.0} };
     
-    falcon_dsp::falcon_dsp_fir_filter filter_obj(coeffs);
+    falcon_dsp::falcon_dsp_fir_filter_cuda filter_obj(coeffs);
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -305,16 +304,16 @@ TEST(falcon_dsp_fir_filter, cpp_basic_filter_float_003)
     }
 }
 
-TEST(falcon_dsp_fir_filter, cpp_fir_filter_010)
+TEST(falcon_dsp_fir_filter, cuda_fir_filter_010)
 {
-    run_cpp_fir_filter_test("./vectors/test_010_x.bin",
-                            "./vectors/test_010.filter_coeffs.txt",
-                            "./vectors/test_010_y.bin");
+    run_cuda_fir_filter_test("./vectors/test_010_x.bin",
+                             "./vectors/test_010.filter_coeffs.txt",
+                             "./vectors/test_010_y.bin");
 }
 
-TEST(falcon_dsp_fir_filter, cpp_fir_filter_011)
+TEST(falcon_dsp_fir_filter, cuda_fir_filter_011)
 {
-    run_cpp_fir_filter_test("./vectors/test_011_x.bin",
-                            "./vectors/test_011.filter_coeffs.txt",
-                            "./vectors/test_011_y.bin");
+    run_cuda_fir_filter_test("./vectors/test_011_x.bin",
+                             "./vectors/test_011.filter_coeffs.txt",
+                             "./vectors/test_011_y.bin");
 }
