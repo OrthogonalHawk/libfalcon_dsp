@@ -101,8 +101,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 const bool TIMING_ENABLED = true;
 
-const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 512;
+const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 32;
 const uint32_t MAX_NUM_CUDA_THREADS = 256;
+
+/* use CUDA shared memory to hold coefficient data if possible. for the Jetson
+ *  Nano there appears to be 49152 bytes of shared memory. let's round this down
+ *  to 48 Kbytes. each coefficient is two float values, so 8 bytes each. there
+ *  should therefore be room for up to 6000 coefficients in shared memory.
+ *
+ * [1] https://devtalk.nvidia.com/default/topic/1056895/jetson-nano/about-jetson-nano-device-query/
+ */
+const uint32_t MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY = 6000;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -159,7 +168,8 @@ namespace falcon_dsp
                                     uint32_t start_output_idx,
                                     uint32_t up_rate,
                                     uint32_t down_rate)
-    {        
+    {
+        __shared__ cuFloatComplex s_coeffs[MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY];
         output_sample_s out_samples[MAX_NUM_OUTPUTS_PER_CUDA_THREAD];
         
         /* sanity check inputs */
@@ -169,6 +179,20 @@ namespace falcon_dsp
             num_outputs_per_cuda_thread > MAX_NUM_OUTPUTS_PER_CUDA_THREAD)
         {
             return;
+        }
+        
+        /* optionaly load coefficients into shared memory */
+        if (coeffs_len < MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY)
+        {
+            uint32_t num_coefficients_per_thread = (coeffs_len / blockDim.x) + 1;
+            for (uint32_t coeff_idx = threadIdx.x * num_coefficients_per_thread;
+                 coeff_idx < ((threadIdx.x * num_coefficients_per_thread) + num_coefficients_per_thread);
+                 ++coeff_idx)
+            {
+                s_coeffs[coeff_idx] = coeffs[coeff_idx];
+            }
+            
+            __syncthreads();
         }
         
         /* compute the thread index */
@@ -186,6 +210,7 @@ namespace falcon_dsp
             return;
         }
         
+        // TODO do this calculation on the host 
         /* iterate through the cycle parameters until the first output sample
          *  that this thread is responsible for; based on the check above the
          *  thread is responsible for at least ONE output sample */
@@ -202,7 +227,14 @@ namespace falcon_dsp
         /* capture the FIRST output sample information; based on the previous
          *  checks the thread is responsible for at least ONE output sample */
         out_samples[0].active = true;
-        out_samples[0].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+        if (coeffs_len < MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY)
+        {
+            out_samples[0].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
+        }
+        else
+        {
+            out_samples[0].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+        }
         out_samples[0].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
         out_samples[0].data_stop_idx = thread_x_idx;
 
@@ -213,7 +245,6 @@ namespace falcon_dsp
         /* ensure that the output sample is still within the range of the
          *  configured output data; there may be cases where some threads in
          *  a thread block are not needed. */
-        uint32_t num_active_out_samples = 1;
         for (uint32_t out_sample_idx = 1;
              out_sample_idx < num_outputs_per_cuda_thread &&
                  (out_sample_idx + thread_start_output_sample_idx) < out_len;
@@ -226,18 +257,25 @@ namespace falcon_dsp
             
             /* store parameters for the next output sample */
             out_samples[out_sample_idx].active = true;
-            out_samples[out_sample_idx].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+            if (coeffs_len < MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY)
+            {
+                out_samples[out_sample_idx].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
+            }
+            else
+            {
+                out_samples[out_sample_idx].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+            }
             out_samples[out_sample_idx].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
             out_samples[out_sample_idx].data_stop_idx = thread_x_idx;
             
             /* update the thread input sample tracking */
             thread_data_stop_idx = out_samples[out_sample_idx].data_stop_idx;
-            
-            num_active_out_samples++;
         }
         
         uint32_t first_active_out_sample = 0;
         cuFloatComplex next_x_val;
+        next_x_val.x = 0.0;
+        next_x_val.y = 0.0;
         
         /* read samples from the input buffer and process for each one of the outputs
          *  that require an input from each input sample */
@@ -250,9 +288,9 @@ namespace falcon_dsp
             
             for (uint32_t thread_out_sample_idx = first_active_out_sample;
                  thread_out_sample_idx < num_outputs_per_cuda_thread &&
-                     out_samples[thread_out_sample_idx].active;
+                    out_samples[thread_out_sample_idx].active;
                  ++thread_out_sample_idx)
-            {                
+            {
                 /* we don't need to check whether x_idx is less than data_stop_idx
                  *  here because it's checked later and once x_idx is >= data_stop_idx
                  *  this output is 'disabled' and will no longer be assessed */
@@ -262,8 +300,8 @@ namespace falcon_dsp
                             cuCaddf(out_samples[thread_out_sample_idx].acc,
                                     cuCmulf(next_x_val, *(out_samples[thread_out_sample_idx].coeff_ptr++)));
 
-                    if ((out_samples[thread_out_sample_idx].data_stop_idx) <= x_idx)
-                    {
+                    if (out_samples[thread_out_sample_idx].data_stop_idx <= x_idx)
+                    { 
                         /* finished accumulating for this output; it is ready to 
                          *  be transferred to the output array (performed later) */
                         first_active_out_sample++;
@@ -438,9 +476,6 @@ namespace falcon_dsp
         cudaDeviceSynchronize();
         
         timer.log_duration("Filtering");
-        
-        printf("Threads finished... cur_out_idx=%u num_outputs_from_thread_blocks=%u\n",
-            cur_out_idx, num_outputs_from_thread_blocks);
         
         /* copy output samples out of CUDA memory */
         cudaMemcpy(out.data() + cur_out_idx,
