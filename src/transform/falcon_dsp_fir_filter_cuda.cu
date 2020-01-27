@@ -212,6 +212,10 @@ namespace falcon_dsp
                                     cudaMemcpyHostToDevice));
         
         m_input_padding_in_samples = m_coefficients.size() - 1;
+
+        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+         *  can better handle complex<float> data, which is natively 8 bytes in size */
+        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
     }
     
     falcon_dsp_fir_filter_cuda::~falcon_dsp_fir_filter_cuda(void)

@@ -64,6 +64,8 @@ const bool TIMING_LOGS_ENABLED = false;
 const uint32_t DUMMY_SAMPLE_RATE_IN_SPS = 1e6;
 const float DUMMY_FREQ_SHIFT_IN_HZ = 0.0;
 
+const uint32_t MAX_NUM_CUDA_THREADS = 1024;
+
 /* setting this value based on empirical tests. setting to 4 makes some sense as
  *  well based on the CUDA memory management. each cuFloatComplex is 8 bytes, which
  *  means that four of them can be retrieved in a 32-byte transaction. increasing
@@ -325,6 +327,10 @@ namespace falcon_dsp
          *  on the host, but is copied to the device when the 'apply' method is invoked */
         cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
                                            m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
+                                           
+        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+         *  can better handle complex<float> data, which is natively 8 bytes in size */
+        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
     }
 
     falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz)
@@ -347,6 +353,10 @@ namespace falcon_dsp
          *  on the host, but is copied to the device when the 'apply' method is invoked */
         cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
                                            m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
+
+        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+         *  can better handle complex<float> data, which is natively 8 bytes in size */
+        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
     }
     
     falcon_dsp_freq_shift_cuda::~falcon_dsp_freq_shift_cuda(void)
@@ -481,22 +491,21 @@ namespace falcon_dsp
                          cudaMemcpyHostToDevice));
         
         /* run kernel on the GPU */
-        uint32_t num_samples_per_thread = 4;
-        uint32_t thread_block_size = 256;
-        uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
+        uint32_t num_samples_per_thread = MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_KERNEL;
+        uint32_t samples_per_thread_block = num_samples_per_thread * MAX_NUM_CUDA_THREADS;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
         falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_LOGS_ENABLED);
         if (m_freq_shift_channels.size() == 1)
         {
-            __freq_shift<<<num_thread_blocks, thread_block_size>>>(m_freq_shift_channels[0]->num_samples_handled,
-                                                                   m_freq_shift_channels[0]->time_shift_rollover_sample_idx,
-                                                                   m_freq_shift_channels[0]->angular_freq,
-                                                                   num_samples_per_thread,
-                                                                   cuda_float_complex_input_data,
-                                                                   m_max_num_input_samples,
-                                                                   cuda_float_complex_input_data, /* modify in place */
-                                                                   m_max_num_input_samples);
+            __freq_shift<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(m_freq_shift_channels[0]->num_samples_handled,
+                                                                      m_freq_shift_channels[0]->time_shift_rollover_sample_idx,
+                                                                      m_freq_shift_channels[0]->angular_freq,
+                                                                      num_samples_per_thread,
+                                                                      cuda_float_complex_input_data,
+                                                                      m_max_num_input_samples,
+                                                                      cuda_float_complex_input_data, /* modify in place */
+                                                                      m_max_num_input_samples);
         
             cudaErrChkAssert(cudaPeekAtLastError());
             
@@ -524,7 +533,7 @@ namespace falcon_dsp
                                  cudaMemcpyHostToDevice));
             }
 
-            __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size, shared_memory_size_in_bytes>>>(
+            __freq_shift_multi_chan<<<num_thread_blocks, MAX_NUM_CUDA_THREADS, shared_memory_size_in_bytes>>>(
                     d_freq_shift_channels,
                     m_freq_shift_channels.size(),
                     num_samples_per_thread,
