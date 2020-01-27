@@ -53,6 +53,7 @@
 
 #include "transform/falcon_dsp_freq_shift_cuda.h"
 #include "utilities/falcon_dsp_host_timer.h"
+#include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -322,7 +323,8 @@ namespace falcon_dsp
         
         /* allocate CUDA memory for the channel information; the master copy is kept
          *  on the host, but is copied to the device when the 'apply' method is invoked */
-        cudaMallocManaged(&d_freq_shift_channels, m_freq_shift_channels.size() * sizeof(freq_shift_channel_s));
+        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
+                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
     }
 
     falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz)
@@ -343,7 +345,8 @@ namespace falcon_dsp
           
         /* allocate CUDA memory for the channel information; the master copy is kept
          *  on the host, but is copied to the device when the 'apply' method is invoked */
-        cudaMallocManaged(&d_freq_shift_channels, m_freq_shift_channels.size() * sizeof(freq_shift_channel_s));
+        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
+                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
     }
     
     falcon_dsp_freq_shift_cuda::~falcon_dsp_freq_shift_cuda(void)
@@ -358,7 +361,7 @@ namespace falcon_dsp
          *  the channel information when CUDA kernels are running */
         if (d_freq_shift_channels)
         {
-            cudaFree(d_freq_shift_channels);
+            cudaErrChk(cudaFree(d_freq_shift_channels));
             d_freq_shift_channels = nullptr;
         }
     }
@@ -436,12 +439,13 @@ namespace falcon_dsp
         {
             if (m_cuda_input_data)
             {
-                cudaFree(m_cuda_input_data);
+                cudaErrChkAssert(cudaFree(m_cuda_input_data));
                 m_cuda_input_data = nullptr;
                 m_max_num_input_samples = 0;
             }
             
-            cudaMallocManaged(&m_cuda_input_data, in.size() * sizeof(std::complex<float>));
+            cudaErrChkAssert(cudaMallocManaged(&m_cuda_input_data,
+                                               in.size() * sizeof(std::complex<float>)));
             m_max_num_input_samples = in.size();
         }
         
@@ -457,23 +461,24 @@ namespace falcon_dsp
                 /* clean up existing memory */
                 if (m_freq_shift_channels[chan_idx]->out_data)
                 {
-                    cudaFree(m_freq_shift_channels[chan_idx]->out_data);
+                    cudaErrChkAssert(cudaFree(m_freq_shift_channels[chan_idx]->out_data));
                     m_freq_shift_channels[chan_idx]->out_data = nullptr;
                     m_freq_shift_channels[chan_idx]->out_data_len = 0;
                 }
                 
                 /* allocate CUDA unified memory space for the output data */
-                cudaMallocManaged(&(m_freq_shift_channels[chan_idx]->out_data), in.size() * sizeof(std::complex<float>));
+                cudaErrChkAssert(cudaMallocManaged(&(m_freq_shift_channels[chan_idx]->out_data),
+                                                   in.size() * sizeof(std::complex<float>)));
                 m_freq_shift_channels[chan_idx]->out_data_len = in.size();
             }
         }
         
         /* copy the input data to the GPU */
         cuFloatComplex * cuda_float_complex_input_data = static_cast<cuFloatComplex *>(m_cuda_input_data);        
-        cudaMemcpy(static_cast<void *>(cuda_float_complex_input_data),
-                   static_cast<void *>(in.data()),
-                   in.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(cuda_float_complex_input_data),
+                         static_cast<void *>(in.data()),
+                         in.size() * sizeof(std::complex<float>),
+                         cudaMemcpyHostToDevice));
         
         /* run kernel on the GPU */
         uint32_t num_samples_per_thread = 4;
@@ -493,16 +498,18 @@ namespace falcon_dsp
                                                                    cuda_float_complex_input_data, /* modify in place */
                                                                    m_max_num_input_samples);
         
+            cudaErrChkAssert(cudaPeekAtLastError());
+            
             /* wait for GPU to finish before accessing on host */
-            cudaDeviceSynchronize();
+            cudaErrChkAssert(cudaDeviceSynchronize());
             
             timer.log_duration("Single Chan Kernel Complete");
         
             /* copy output samples out of CUDA memory */
-            cudaMemcpy(static_cast<void *>(out[0].data()),
-                       static_cast<void *>(cuda_float_complex_input_data),
-                       in.size() * sizeof(std::complex<float>),
-                       cudaMemcpyDeviceToHost);
+            cudaErrChkAssert(cudaMemcpy(static_cast<void *>(out[0].data()),
+                             static_cast<void *>(cuda_float_complex_input_data),
+                             in.size() * sizeof(std::complex<float>),
+                             cudaMemcpyDeviceToHost));
         }
         else /* use the multi-channel kernel */
         {
@@ -511,10 +518,10 @@ namespace falcon_dsp
             /* copy the channel information to the GPU */
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
             {
-                cudaMemcpy(static_cast<void *>(&d_freq_shift_channels[chan_idx]),
-                           static_cast<void *>(m_freq_shift_channels[chan_idx].get()),
-                           sizeof(freq_shift_channel_s),
-                           cudaMemcpyHostToDevice);
+                cudaErrChkAssert(cudaMemcpy(static_cast<void *>(&d_freq_shift_channels[chan_idx]),
+                                 static_cast<void *>(m_freq_shift_channels[chan_idx].get()),
+                                 sizeof(freq_shift_channel_s),
+                                 cudaMemcpyHostToDevice));
             }
 
             __freq_shift_multi_chan<<<num_thread_blocks, thread_block_size, shared_memory_size_in_bytes>>>(
@@ -524,18 +531,20 @@ namespace falcon_dsp
                     cuda_float_complex_input_data,
                     m_max_num_input_samples);
             
+            cudaErrChkAssert(cudaPeekAtLastError());
+            
             /* wait for GPU to finish before accessing on host */
-            cudaDeviceSynchronize();
+            cudaErrChkAssert(cudaDeviceSynchronize());
             
             timer.log_duration("Multi Chan Kernel Complete");
 
             /* copy output samples out of CUDA memory */
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
             {
-                cudaMemcpy(static_cast<void *>(out[chan_idx].data()),
-                           static_cast<void *>(m_freq_shift_channels[chan_idx]->out_data),
-                           in.size() * sizeof(std::complex<float>),
-                           cudaMemcpyDeviceToHost);                
+                cudaErrChkAssert(cudaMemcpy(static_cast<void *>(out[chan_idx].data()),
+                                 static_cast<void *>(m_freq_shift_channels[chan_idx]->out_data),
+                                 in.size() * sizeof(std::complex<float>),
+                                 cudaMemcpyDeviceToHost));
             }
         }
 
