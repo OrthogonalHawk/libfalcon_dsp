@@ -66,24 +66,29 @@
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                           FUNCTION DECLARATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
+    /******************************************************************************
+     *                              ENUMS & TYPEDEFS
+     *****************************************************************************/
+ 
     enum class file_type_e : uint32_t
     {
         BINARY = 0,
         ASCII
     };
 
+
+    /******************************************************************************
+     *                           FUNCTION DECLARATION
+     *****************************************************************************/
+    
     /* @brief Computes filter delay in terms of samples
      * @description Computes the filter delay in samples based on the provided
      *               filter coefficients and resampling ratio.
      * @param[in]  num_coeffs               - number of filter coefficients
      * @param[in]  in_sample_rate_in_sps    - input data sample rate in samples per second
-     * @param[int] out_sample_rate_in_sps   - output data sample rate in samples per second
+     * @param[in]  out_sample_rate_in_sps   - output data sample rate in samples per second
      * @return Filter delay  in samples
      */
     uint32_t calculate_filter_delay_from_sample_rates(uint32_t num_coeffs, uint32_t in_sample_rate_in_sps, uint32_t out_sample_rate_in_sps);
@@ -171,10 +176,10 @@ namespace falcon_dsp
      */
     bool read_complex_data_from_file(std::string file_name, file_type_e, std::vector<std::complex<int16_t>>& data);
     bool read_complex_data_from_file(std::string file_name, file_type_e, std::vector<std::complex<float>>& data);
-}
 
-/******************************************************************************
- *                            CLASS DECLARATION
- *****************************************************************************/
+    /******************************************************************************
+     *                            CLASS DECLARATION
+     *****************************************************************************/
+}
 
 #endif // __FALCON_DSP_UTILS_H__

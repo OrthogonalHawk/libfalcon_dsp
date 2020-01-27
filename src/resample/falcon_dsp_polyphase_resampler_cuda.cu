@@ -94,6 +94,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "resample/falcon_dsp_polyphase_resampler_cuda.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
+#include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -145,27 +146,6 @@ namespace falcon_dsp
     /******************************************************************************
      *                         FUNCTION IMPLEMENTATION
      *****************************************************************************/
-    
-    using clock_value_t = long long;
-    
-    __device__ void cuda_sleep(clock_value_t sleep_cycles)
-    {
-        clock_value_t start = clock64();
-        clock_value_t cycles_elapsed;
-        do { cycles_elapsed = clock64() - start; } 
-        while (cycles_elapsed < sleep_cycles);
-    }
-    
-    #define cudaErrChk(ans) { gpuAssert((ans), __FILE__, __LINE__, false); }
-    #define cudaErrChkAssert(ans) { gpuAssert((ans), __FILE__, __LINE__, true); }
-    inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=false)
-    {
-        if (code != cudaSuccess) 
-        {
-            fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-            if (abort) exit(code);
-        }
-    }
     
     /* CUDA kernel function that resamples the input array */
     __global__
