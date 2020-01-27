@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 OrthogonalHawk
+ * Copyright (c) 2020 OrthogonalHawk
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -51,6 +51,7 @@
 #include <stdint.h>
 
 #include "transform/falcon_dsp_fir_filter_cuda.h"
+#include "utilities/falcon_dsp_cuda_utils.h"
 #include "utilities/falcon_dsp_host_timer.h"
 
 /******************************************************************************
@@ -199,13 +200,14 @@ namespace falcon_dsp
         /* allocate CUDA memory for the coefficient information; since these are set
          *  when the class is constructed and cannot be changed the amount of data
          *  is known now */
-        cudaMallocManaged(&m_cuda_coeff_data, m_coefficients.size() * sizeof(cuFloatComplex));
+        cudaErrChkAssert(cudaMallocManaged(&m_cuda_coeff_data,
+                                           m_coefficients.size() * sizeof(cuFloatComplex)));
             
         /* copy the coefficient information to the GPU */
-        cudaMemcpy(static_cast<void *>(m_cuda_coeff_data),
-                   static_cast<void *>(m_coefficients.data()),
-                   m_coefficients.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(m_cuda_coeff_data),
+                                    static_cast<void *>(m_coefficients.data()),
+                                    m_coefficients.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyHostToDevice));
         
         m_input_padding_in_samples = m_coefficients.size() - 1;
     }
@@ -218,7 +220,7 @@ namespace falcon_dsp
          *  the coefficient information */
         if (m_cuda_coeff_data)
         {
-            cudaFree(m_cuda_coeff_data);
+            cudaErrChk(cudaFree(m_cuda_coeff_data));
         }
     }
 
@@ -276,12 +278,13 @@ namespace falcon_dsp
         {
             if (m_cuda_input_data)
             {
-                cudaFree(m_cuda_input_data);
+                cudaErrChkAssert(cudaFree(m_cuda_input_data));
                 m_cuda_input_data = nullptr;
                 m_max_num_input_samples = 0;
             }
             
-            cudaMallocManaged(&m_cuda_input_data, (in.size() + m_input_padding_in_samples) * sizeof(std::complex<float>));
+            cudaErrChkAssert(cudaMallocManaged(&m_cuda_input_data,
+                                               (in.size() + m_input_padding_in_samples) * sizeof(std::complex<float>)));
             m_max_num_input_samples = in.size() + m_input_padding_in_samples;
         }
         
@@ -291,13 +294,14 @@ namespace falcon_dsp
             /* clean up existing memory */
             if (m_cuda_output_data)
             {
-                cudaFree(m_cuda_output_data);
+                cudaErrChkAssert(cudaFree(m_cuda_output_data));
                 m_cuda_output_data = nullptr;
                 m_max_num_output_samples = 0;
             }
                 
             /* allocate CUDA unified memory space for the output data */
-            cudaMallocManaged(&m_cuda_output_data, in.size() * sizeof(std::complex<float>));
+            cudaErrChkAssert(cudaMallocManaged(&m_cuda_output_data,
+                                               in.size() * sizeof(std::complex<float>)));
             m_max_num_output_samples = in.size();
         }
         
@@ -316,17 +320,17 @@ namespace falcon_dsp
         }
         
         /* copy the padding/state information to the GPU */
-        cudaMemcpy(static_cast<void *>(m_cuda_input_data),
-                   static_cast<void *>(prev_data.data()),
-                   prev_data.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(m_cuda_input_data),
+                                    static_cast<void *>(prev_data.data()),
+                                    prev_data.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyHostToDevice));
         
         /* copy the input data to the GPU; note the offset by prev_data.size() to
          *  provide room for the padding/state samples */
-        cudaMemcpy(static_cast<void *>(m_cuda_input_data + prev_data.size()),
-                   static_cast<void *>(in.data()),
-                   in.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(m_cuda_input_data + prev_data.size()),
+                                    static_cast<void *>(in.data()),
+                                    in.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyHostToDevice));
         
         /* run kernel on the GPU */
         uint32_t num_samples_per_thread = 4;
@@ -344,16 +348,18 @@ namespace falcon_dsp
                                                                m_cuda_output_data,
                                                                m_max_num_output_samples);
         
+        cudaErrChkAssert(cudaPeekAtLastError());
+        
         /* wait for GPU to finish before accessing on host */
-        cudaDeviceSynchronize();
+        cudaErrChkAssert(cudaDeviceSynchronize());
             
         timer.log_duration("Single Chan Kernel Complete");
         
         /* copy output samples out of CUDA memory */
-        cudaMemcpy(static_cast<void *>(out.data()),
-                   static_cast<void *>(m_cuda_output_data),
-                   in.size() * sizeof(std::complex<float>),
-                   cudaMemcpyDeviceToHost);
+        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(out.data()),
+                                    static_cast<void *>(m_cuda_output_data),
+                                    in.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyDeviceToHost));
 
         /* finished handling the current data; now update the state array */
         _update_state(in);
