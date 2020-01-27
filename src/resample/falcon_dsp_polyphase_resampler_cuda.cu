@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 OrthogonalHawk
+ * Copyright (c) 2020 OrthogonalHawk
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -78,6 +78,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 22-Apr-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Fixing bugs with implementation and switched to
+ *                               fully specified class from templated class.
  *
  *****************************************************************************/
 
@@ -86,21 +88,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 #include <iostream>
-#include <cuComplex.h>
 #include <numeric>
 #include <stdint.h>
 
 #include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
  *****************************************************************************/
 
-const uint32_t MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL = 16384 * 16;
-const uint32_t MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK = 256;
+const bool TIMING_ENABLED = true;
 
-const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 32;
+const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 512;
 const uint32_t MAX_NUM_CUDA_THREADS = 256;
 
 /******************************************************************************
@@ -109,6 +110,16 @@ const uint32_t MAX_NUM_CUDA_THREADS = 256;
 
 struct output_sample_s
 {
+    __device__ output_sample_s(void)
+      : active(false),
+        coeff_ptr(nullptr),
+        data_start_idx(LONG_MAX),
+        data_stop_idx(LONG_MAX)
+    {
+        acc.x = 0;
+        acc.y = 0;
+    }
+    
     bool             active;
     cuFloatComplex   acc;
     cuFloatComplex * coeff_ptr;
@@ -120,27 +131,179 @@ struct output_sample_s
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
-    template<class T, class C>
-    falcon_dsp_polyphase_resampler_cuda<T, C>::falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate, std::vector<C>& filter_coeffs)
-      : falcon_dsp_polyphase_resampler<T, C>(up_rate, down_rate, filter_coeffs)
+    /******************************************************************************
+     *                         FUNCTION IMPLEMENTATION
+     *****************************************************************************/
+    
+    using clock_value_t = long long;
+    
+    __device__ void cuda_sleep(clock_value_t sleep_cycles)
+    {
+        clock_value_t start = clock64();
+        clock_value_t cycles_elapsed;
+        do { cycles_elapsed = clock64() - start; } 
+        while (cycles_elapsed < sleep_cycles);
+    }
+    
+    /* CUDA kernel function that resamples the input array */
+    __global__
+    void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                    cuFloatComplex * in, uint32_t in_len,
+                                    cuFloatComplex * out, uint32_t out_len,
+                                    uint32_t coeffs_per_phase,
+                                    uint32_t num_outputs_per_cuda_thread,
+                                    int64_t start_x_idx,
+                                    uint32_t start_t,
+                                    uint32_t start_output_idx,
+                                    uint32_t up_rate,
+                                    uint32_t down_rate)
+    {        
+        output_sample_s out_samples[MAX_NUM_OUTPUTS_PER_CUDA_THREAD];
+        
+        /* sanity check inputs */
+        if (in == nullptr ||
+            out == nullptr ||
+            coeffs == nullptr ||
+            num_outputs_per_cuda_thread > MAX_NUM_OUTPUTS_PER_CUDA_THREAD)
+        {
+            return;
+        }
+        
+        /* compute the thread index */
+        uint32_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+        
+        /* compute local thread variables */
+        int64_t thread_x_idx = start_x_idx;
+        uint32_t thread_t = start_t;
+        
+        int64_t thread_start_output_sample_idx = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
+        
+        /* verify that this thread has at least one output to compute */
+        if (thread_start_output_sample_idx >= out_len)
+        {
+            return;
+        }
+        
+        /* iterate through the cycle parameters until the first output sample
+         *  that this thread is responsible for; based on the check above the
+         *  thread is responsible for at least ONE output sample */
+        for (int64_t out_sample_idx = start_output_idx;
+             out_sample_idx < thread_start_output_sample_idx;
+             ++out_sample_idx)
+        {
+            /* compute the next output sample 'cycle' updates */
+            thread_t += down_rate;
+            thread_x_idx += thread_t / up_rate;
+            thread_t %= up_rate;
+        }
+        
+        /* capture the FIRST output sample information; based on the previous
+         *  checks the thread is responsible for at least ONE output sample */
+        out_samples[0].active = true;
+        out_samples[0].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+        out_samples[0].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
+        out_samples[0].data_stop_idx = thread_x_idx;
+
+        /* start tracking the input samples that this thread will need to access */
+        int64_t thread_data_start_idx = out_samples[0].data_start_idx;
+        int64_t thread_data_stop_idx =  out_samples[0].data_stop_idx;
+        
+        /* ensure that the output sample is still within the range of the
+         *  configured output data; there may be cases where some threads in
+         *  a thread block are not needed. */
+        uint32_t num_active_out_samples = 1;
+        for (uint32_t out_sample_idx = 1;
+             out_sample_idx < num_outputs_per_cuda_thread &&
+                 (out_sample_idx + thread_start_output_sample_idx) < out_len;
+             ++out_sample_idx)
+        {
+            /* compute the next output sample 'cycle' updates */
+            thread_t += down_rate;
+            thread_x_idx += thread_t / up_rate;
+            thread_t %= up_rate;
+            
+            /* store parameters for the next output sample */
+            out_samples[out_sample_idx].active = true;
+            out_samples[out_sample_idx].coeff_ptr = coeffs + thread_t * coeffs_per_phase;
+            out_samples[out_sample_idx].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
+            out_samples[out_sample_idx].data_stop_idx = thread_x_idx;
+            
+            /* update the thread input sample tracking */
+            thread_data_stop_idx = out_samples[out_sample_idx].data_stop_idx;
+            
+            num_active_out_samples++;
+        }
+        
+        uint32_t first_active_out_sample = 0;
+        cuFloatComplex next_x_val;
+        
+        /* read samples from the input buffer and process for each one of the outputs
+         *  that require an input from each input sample */
+        for (int64_t x_idx = thread_data_start_idx;
+             x_idx < (thread_data_stop_idx + 1) &&
+                 x_idx < in_len;
+             ++x_idx)
+        {
+            next_x_val = in[x_idx];
+            
+            for (uint32_t thread_out_sample_idx = first_active_out_sample;
+                 thread_out_sample_idx < num_outputs_per_cuda_thread &&
+                     out_samples[thread_out_sample_idx].active;
+                 ++thread_out_sample_idx)
+            {                
+                /* we don't need to check whether x_idx is less than data_stop_idx
+                 *  here because it's checked later and once x_idx is >= data_stop_idx
+                 *  this output is 'disabled' and will no longer be assessed */
+                if (x_idx >= out_samples[thread_out_sample_idx].data_start_idx)
+                {
+                    out_samples[thread_out_sample_idx].acc =
+                            cuCaddf(out_samples[thread_out_sample_idx].acc,
+                                    cuCmulf(next_x_val, *(out_samples[thread_out_sample_idx].coeff_ptr++)));
+
+                    if ((out_samples[thread_out_sample_idx].data_stop_idx) <= x_idx)
+                    {
+                        /* finished accumulating for this output; it is ready to 
+                         *  be transferred to the output array (performed later) */
+                        first_active_out_sample++;
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        
+        /* set the global outputs */
+        uint64_t global_output_sample_idx_base = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
+        for (uint32_t out_sample_idx = 0;
+             out_sample_idx < num_outputs_per_cuda_thread &&
+                 out_samples[out_sample_idx].active;
+             ++out_sample_idx)
+        {
+            out[global_output_sample_idx_base + out_sample_idx] = out_samples[out_sample_idx].acc;
+        }
+    }
+    
+    
+    /******************************************************************************
+     *                            CLASS IMPLEMENTATION
+     *****************************************************************************/
+    
+    falcon_dsp_polyphase_resampler_cuda::falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate,
+                                                                             std::vector<std::complex<float>>& filter_coeffs)
+      : falcon_dsp_polyphase_resampler(up_rate, down_rate, filter_coeffs)
     {
         /* allocate CUDA unified memory space for filter coefficients */
-        cudaMallocManaged(&m_cuda_filter_coeffs, falcon_dsp_polyphase_resampler<T, C>::m_transposed_coeffs.size() * sizeof(C));
-                  
-        /* allocate CUDA unified memory space for input and output data */
-        m_max_num_cuda_input_samples = (MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL +
-                                        falcon_dsp_polyphase_resampler<T, C>::m_coeffs_per_phase + 1);
-        
-        m_max_num_cuda_output_samples = falcon_dsp_polyphase_resampler<T, C>::needed_out_count(MAX_NUM_INPUT_SAMPLES_PER_CUDA_KERNEL);
-        
-        cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(T));
-        cudaMallocManaged(&m_cuda_output_samples, m_max_num_cuda_output_samples * sizeof(T));
+        cudaMallocManaged(&m_cuda_filter_coeffs, m_transposed_coeffs.size() * sizeof(std::complex<float>));
+
+        /* copy the filter coefficients into CUDA memory */
+        cudaMemcpy(m_cuda_filter_coeffs,
+                   m_transposed_coeffs.data(),
+                   m_transposed_coeffs.size() * sizeof(std::complex<float>),
+                   cudaMemcpyHostToDevice);
 
         /* calculate the average number of samples that are advanced for
          *  each output sample */
@@ -150,24 +313,16 @@ namespace falcon_dsp
          *  is chosen to minimize the number of repeated requests for the same
          *  input data from global memory and to prevent memory buffer collisions
          *  between CUDA threads in the same warp */
-        m_num_outputs_per_cuda_thread = static_cast<uint32_t>(
-                                            std::ceil(static_cast<float>(falcon_dsp::calculate_filter_delay_from_up_down_rates(filter_coeffs.size(), up_rate, down_rate)) /
-                                                      static_cast<float>(falcon_dsp_polyphase_resampler_cuda<T, C>::m_avg_advance_per_output_sample)));
-
-        if (m_num_outputs_per_cuda_thread > MAX_NUM_OUTPUTS_PER_CUDA_THREAD)
-        {
-            m_num_outputs_per_cuda_thread = MAX_NUM_OUTPUTS_PER_CUDA_THREAD;
-        }
+        m_num_outputs_per_cuda_thread = MAX_NUM_OUTPUTS_PER_CUDA_THREAD;        
         
        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
         *  can better handle complex<float> data, which is natively 8 bytes in size */
        cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
     }
     
-    template<class T, class C>
-    falcon_dsp_polyphase_resampler_cuda<T, C>::~falcon_dsp_polyphase_resampler_cuda(void)
+    falcon_dsp_polyphase_resampler_cuda::~falcon_dsp_polyphase_resampler_cuda(void)
     {
-        std::lock_guard<std::mutex> lock(falcon_dsp_polyphase_resampler<T, C>::m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         
         if (m_cuda_filter_coeffs)
         {
@@ -187,314 +342,130 @@ namespace falcon_dsp
             m_cuda_output_samples = nullptr;
         }
     }
-
-    /* CUDA kernel function that resamples the input array */
-    __global__
-    void _polyphase_resampler_cuda(cuFloatComplex * in, uint32_t in_len,
-                                   cuFloatComplex * out, uint32_t out_len,
-                                   cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                   uint32_t coeffs_per_phase,
-                                   uint32_t num_outputs_per_cuda_thread,
-                                   int64_t start_x_idx,
-                                   uint32_t start_t,
-                                   uint32_t start_output_idx,
-                                   uint32_t up_rate,
-                                   uint32_t down_rate)
-    {
-        __shared__ cuFloatComplex s_coeffs[MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK];
-        output_sample_s out_samples[MAX_NUM_OUTPUTS_PER_CUDA_THREAD];
-
-        /* initialize the output sample data structures */
-        for (uint32_t ii = 0;
-             ii < num_outputs_per_cuda_thread && ii < MAX_NUM_OUTPUTS_PER_CUDA_THREAD;
-             ++ii)
-        {
-            out_samples[ii].active = false;
-            out_samples[ii].coeff_ptr = nullptr;
-            out_samples[ii].data_start_idx = LONG_MAX;
-            out_samples[ii].data_stop_idx = LONG_MAX;
-            out_samples[ii].acc.x = 0;
-            out_samples[ii].acc.y = 0;
-        }
-
-        /* compute the thread index */
-        uint32_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-
-        /* copy coefficients to shared memory */
-        if (threadIdx.x < coeffs_len)
-        {
-            s_coeffs[threadIdx.x] = coeffs[threadIdx.x];
-        }
-        __syncthreads();
-
-        /* compute local thread variables */
-        int64_t thread_x_idx = start_x_idx;
-        uint32_t thread_t = start_t;
-        
-        int64_t thread_start_output_sample_idx = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
-        
-        /* verify that this thread has at least one output to compute */
-        if (thread_start_output_sample_idx >= out_len)
-        {
-            return;
-        }
-        
-        for (int64_t out_sample_idx = start_output_idx;
-             out_sample_idx < thread_start_output_sample_idx;
-             ++out_sample_idx)
-        {
-            /* compute the next output sample 'cycle' updates */
-            thread_t += down_rate;
-            thread_x_idx += thread_t / up_rate;
-            thread_t %= up_rate;
-        }
-        
-        /* capture the FIRST output sample information */
-        out_samples[0].active = true;
-        out_samples[0].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
-        out_samples[0].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
-        out_samples[0].data_stop_idx = thread_x_idx;
-
-        int64_t thread_data_start_idx = out_samples[0].data_start_idx;
-        int64_t thread_data_stop_idx =  out_samples[0].data_stop_idx;
-        
-        /* ensure that the output sample is still within the range of the
-         *  configured output data; there may be cases where some threads in
-         *  a thread block are not needed. */
-        for (uint32_t out_sample_idx = 1;
-             out_sample_idx < num_outputs_per_cuda_thread && (out_sample_idx + thread_start_output_sample_idx) < out_len;
-             ++out_sample_idx)
-        {
-            /* compute the next output sample 'cycle' updates */
-            thread_t += down_rate;
-            thread_x_idx += thread_t / up_rate;
-            thread_t %= up_rate;
-            
-            out_samples[out_sample_idx].active = true;
-            out_samples[out_sample_idx].coeff_ptr = s_coeffs + thread_t * coeffs_per_phase;
-            out_samples[out_sample_idx].data_start_idx = thread_x_idx - coeffs_per_phase + 1;
-            out_samples[out_sample_idx].data_stop_idx = thread_x_idx;
-            
-            thread_data_stop_idx = out_samples[out_sample_idx].data_stop_idx;
-        }
-        
-        uint32_t first_active_out_sample = 0;
-        cuFloatComplex next_x_val;
-        for (int64_t x_idx = thread_data_start_idx; x_idx < thread_data_stop_idx; ++x_idx)
-        {
-            next_x_val = in[x_idx];
-            for (uint32_t thread_out_sample_idx = first_active_out_sample;
-                 thread_out_sample_idx < num_outputs_per_cuda_thread;
-                 ++thread_out_sample_idx)
-            {               
-                /* we don't need to check whether x_idx is less than data_stop_idx
-                 *  here because it's checked later and once x_idx is >= data_stop_idx
-                 *  this output is 'disabled' and will no longer be assessed */
-                if (x_idx >= out_samples[thread_out_sample_idx].data_start_idx)
-                {                   
-                    out_samples[thread_out_sample_idx].acc = cuCaddf(out_samples[thread_out_sample_idx].acc,
-                                                                     cuCmulf(next_x_val, *(out_samples[thread_out_sample_idx].coeff_ptr++)));
-                                                              
-                    if ((out_samples[thread_out_sample_idx].data_stop_idx - 1) <= x_idx)
-                    {
-                        /* finished computing acc for this output */
-                        first_active_out_sample++;
-                    }
-                }
-                else
-                {
-                    break;
-                }
-            }
-        }
-        
-        /* set the global outputs */
-        uint64_t global_output_sample_idx_base = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
-        for (uint32_t out_sample_idx = 0;
-             out_sample_idx < num_outputs_per_cuda_thread && out_samples[out_sample_idx].active;
-             ++out_sample_idx)
-        {
-            out[global_output_sample_idx_base + out_sample_idx] = out_samples[out_sample_idx].acc;
-        }
-    }
     
-    /* specialized implementation */
-    template<>
-    int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<input_type>& in, std::vector<output_type>& out)
+    int32_t falcon_dsp_polyphase_resampler_cuda::apply(std::vector<std::complex<float>>& in,
+                                                       std::vector<std::complex<float>>& out)
     {
-        std::lock_guard<std::mutex> lock(falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         
-        /* copy the filter coefficients into CUDA memory */
-        cudaMemcpy(m_cuda_filter_coeffs,
-                   m_transposed_coeffs.data(),
-                   m_transposed_coeffs.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice );
+        /* allocate CUDA unified memory space for input and output data. it is left as a future
+         *  optimization to break the input data into chunks to limit the amount of memory */
+        if (m_max_num_cuda_input_samples != (in.size() + m_state.size()))
+        {
+            if (m_cuda_input_samples)
+            {
+                cudaFree(m_cuda_input_samples);
+                m_cuda_input_samples = nullptr;
+                m_max_num_cuda_input_samples = 0;
+            }
+            
+            m_max_num_cuda_input_samples = in.size() + m_state.size();
+            cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(std::complex<float>));
+        }
         
-        cuFloatComplex * cuda_filter_coeffs = static_cast<cuFloatComplex *>(m_cuda_filter_coeffs);
-        cuFloatComplex * cuda_input_data = static_cast<cuFloatComplex *>(m_cuda_input_samples);
-        cuFloatComplex * cuda_output_data = static_cast<cuFloatComplex *>(m_cuda_output_samples);
+        if (m_max_num_cuda_output_samples != needed_out_count(in.size()))
+        {
+            if (m_cuda_output_samples)
+            {
+                cudaFree(m_cuda_output_samples);
+                m_cuda_output_samples = nullptr;
+                m_max_num_cuda_output_samples = 0;
+            }
+            
+            m_max_num_cuda_output_samples = needed_out_count(in.size());
+            cudaMallocManaged(&m_cuda_output_samples, m_max_num_cuda_output_samples * sizeof(std::complex<float>));
+        }
         
         /* clear out the output and allocate space for the resulting data */
         out.clear();
-        out.reserve(needed_out_count(in.size()));
-        for (uint32_t out_idx = 0;
-             out_idx < needed_out_count(in.size());
-             ++out_idx)
-        {
-            out.push_back(std::complex<float>(0, 0));
-        }
+        out.resize(m_max_num_cuda_output_samples, std::complex<float>(0.0, 0.0));
         uint32_t cur_out_idx = 0;
         
-        /* don't bother with running a CUDA/GPU implementation if the input size is not
-         *  larger than the state vector */
-        if (in.size() <= falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.size())
-        {
-            return falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(in, out);  
-        }
+        /* copy the state vector into CUDA memory */
+        cudaMemcpy(m_cuda_input_samples,
+                   m_state.data(),
+                   m_state.size() * sizeof(std::complex<float>),
+                   cudaMemcpyHostToDevice);
         
-        /* copy all input samples into CUDA memory */
-        for (uint32_t in_data_idx = 0; in_data_idx < in.size(); ++in_data_idx)
-        {
-            cuda_input_data[in_data_idx] = *(static_cast<cuFloatComplex *>(static_cast<void *>(&in[in_data_idx])));
-        }
+        /* copy the input samples into CUDA memory */
+        cudaMemcpy(m_cuda_input_samples + m_state.size(),
+                   in.data(),
+                   in.size() * sizeof(std::complex<float>),
+                   cudaMemcpyHostToDevice);
         
-        /* x_idx points to the latest processed input sample */
-        int64_t x_idx = falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_xOffset;
-        while (static_cast<uint64_t>(x_idx) < in.size())
+        /* if possible, handle multiple samples at once using CUDA. check for whether or not
+         *  the state array was required as a way to detect samples at the beginning of the
+         *  input vector */
+        int64_t x_idx = m_xOffset;
+        uint32_t num_thread_blocks = (out.size() - cur_out_idx) / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
+        if ((out.size() - cur_out_idx) % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
         {
-            bool required_state_array = false;
-            
-            /* setup variables for the cases where the next sample is handled in the CPU */
-            output_type acc = output_type(0);
-            typename std::vector<coeff_type>::iterator coeff_iter =
-                m_transposed_coeffs.begin() + m_t * m_coeffs_per_phase;
-            
-            /* need to look back over the previous samples to compute the
-             *  current filtered value */
-            int64_t x_back_idx = x_idx - m_coeffs_per_phase + 1;
-            int64_t offset = 0 - x_back_idx;
-            
-            /* values toward the beginning of the vector may require samples
-             *  from the state array; handle these in C++/CPU */
-            if (offset > 0)
-            {
-                required_state_array = true;
-                
-                /* need to draw from the state buffer */
-                typename std::vector<std::complex<float>>::iterator state_iter = falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.end() - offset;
-                while (state_iter < falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.end())
-                {
-                    acc += *(state_iter++) * *(coeff_iter++);
-                }
-                x_back_idx += offset;
-            }
-            
-            /* if possible, handle multiple samples at once using CUDA. check for whether or not
-             *  the state array was required as a way to detect samples at the beginning of the
-             *  input vector */
-            if (!required_state_array &&
-                (out.size() - cur_out_idx) > 0 &&
-                m_transposed_coeffs.size() < MAX_NUM_SHARED_MEMORY_COEFFS_PER_THREAD_BLOCK)
-            {
-                uint32_t num_thread_blocks = (out.size() - cur_out_idx) / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
-                if ((out.size() - cur_out_idx) % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
-                {
-                    num_thread_blocks++;
-                }
-                
-                printf("Num required thread blocks(%u threads):%u for %u output samples (%u per thread)\n",
-                    MAX_NUM_CUDA_THREADS, num_thread_blocks,
-                    static_cast<uint32_t>((out.size() - cur_out_idx)), m_num_outputs_per_cuda_thread);
-
-                _polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
-                        cuda_input_data,
-                        m_max_num_cuda_input_samples,
-                        cuda_output_data,
-                        m_max_num_cuda_output_samples,
-                        cuda_filter_coeffs,
-                        m_transposed_coeffs.size(),
-                        m_coeffs_per_phase,
-                        m_num_outputs_per_cuda_thread,
-                        x_idx, /* x_start_idx */
-                        m_t,
-                        cur_out_idx,
-                        m_up_rate,
-                        m_down_rate);
-
-                uint32_t num_outputs_from_thread_blocks, new_t;
-                int64_t new_x_idx;
-                compute_next_filter_params(x_idx, in.size(), m_t,
-                                           (out.size() - cur_out_idx),
-                                           num_outputs_from_thread_blocks,
-                                           new_t, new_x_idx);
-
-                /* wait for GPU to finish before accessing on host */
-                cudaDeviceSynchronize();
-                
-                /* copy output samples out of CUDA memory */
-                cudaMemcpy(out.data() + cur_out_idx,
-                           cuda_output_data + cur_out_idx,
-                           num_outputs_from_thread_blocks * sizeof(std::complex<float>),
-                           cudaMemcpyDeviceToHost);
-                
-                /* update tracking parameters */
-                m_t = new_t;
-                x_idx += new_x_idx;
-                cur_out_idx += num_outputs_from_thread_blocks;
-            }
-            else
-            {               
-                /* either handling data at the beginning of the vector or close to the end;
-                 *  just handle here in the CPU to keep things simpler */
-                while (x_back_idx <= x_idx)
-                {
-                    acc += in[x_back_idx++] * *(coeff_iter++);
-                }
-                
-                if (cur_out_idx == 20)
-                {
-                    printf("acc.re=%f acc.im=%f\n", acc.real(), acc.imag());
-                }
-
-                out[cur_out_idx++] = acc;
-                falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_t += falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_down_rate;
-
-                int64_t advance_amount = falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_t / falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_up_rate;
-                x_idx += advance_amount;
-
-                // which phase of the filter to use
-                falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_t %= falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_up_rate;
-            }
+            num_thread_blocks++;
         }
-        
-        falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_xOffset = x_idx - in.size();
+                
+        printf("Num required thread blocks(%u threads):%u for %u output samples (%u per thread)\n",
+            MAX_NUM_CUDA_THREADS, num_thread_blocks,
+            static_cast<uint32_t>((out.size() - cur_out_idx)), m_num_outputs_per_cuda_thread);
 
-        /* finished resampling; now update the state buffer so that future (assumed contiguous)
-         *  input vectors can be resampled using these old samples.
-         * 
-         * based on the check at the start of this function, if the input size is less than
-         *  the state buffer size the computation was passed over to the C++ implementation
-         *  so there is no need to duplicate that handling here. */
+        printf("Launching kernel with m_coeffs_per_phase=%u x_start_idx=%zu\n",
+               m_coeffs_per_phase, m_state.size());
         
-        /* just copy last input samples into state buffer */
-        for (uint64_t state_copy_idx = 0;
-             state_copy_idx < falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.size();
-             ++state_copy_idx)
-        {
-            falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state[state_copy_idx] =
-                in[in.size() - falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::m_state.size() + state_copy_idx];   
-        }
+        falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_ENABLED);
+        
+        __polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                         m_cuda_filter_coeffs,
+                         m_transposed_coeffs.size(),             
+                         m_cuda_input_samples,
+                         m_max_num_cuda_input_samples,
+                         m_cuda_output_samples,
+                         m_max_num_cuda_output_samples,
+                         m_coeffs_per_phase,
+                         m_num_outputs_per_cuda_thread,
+                         m_state.size(), /* x_start_idx */
+                         m_t,
+                         cur_out_idx,
+                         m_up_rate,
+                         m_down_rate);
+
+        uint32_t num_outputs_from_thread_blocks, new_t;
+        int64_t new_x_idx;
+        compute_next_filter_params(x_idx, in.size(), m_t,
+                                   (out.size() - cur_out_idx),
+                                   num_outputs_from_thread_blocks,
+                                   new_t, new_x_idx);
+
+        /* wait for GPU to finish before accessing on host */
+        cudaDeviceSynchronize();
+        
+        timer.log_duration("Filtering");
+        
+        printf("Threads finished... cur_out_idx=%u num_outputs_from_thread_blocks=%u\n",
+            cur_out_idx, num_outputs_from_thread_blocks);
+        
+        /* copy output samples out of CUDA memory */
+        cudaMemcpy(out.data() + cur_out_idx,
+                   m_cuda_output_samples + cur_out_idx,
+                   num_outputs_from_thread_blocks * sizeof(std::complex<float>),
+                   cudaMemcpyDeviceToHost);
+        
+        /* update tracking parameters */
+        m_t = new_t;
+        x_idx += new_x_idx;
+        cur_out_idx += num_outputs_from_thread_blocks; 
+        m_xOffset = x_idx - in.size();
+
+        /* finished resampling; now update the state buffer*/
+        _manage_state(in);
         
         /* number of samples computed */
         return out.size();
     }
     
-    template<class T, class C>
-    void falcon_dsp_polyphase_resampler_cuda<T, C>::compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_t,
-                                                                               uint32_t max_out_samples,
-                                                                               uint32_t& num_out_samples,
-                                                                               uint32_t& new_t,
-                                                                               int64_t& new_x_idx)
+    void falcon_dsp_polyphase_resampler_cuda::compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_t,
+                                                                         uint32_t max_out_samples,
+                                                                         uint32_t& num_out_samples,
+                                                                         uint32_t& new_t,
+                                                                         int64_t& new_x_idx)
     {
         uint32_t local_t = cur_t;
         new_x_idx = cur_x_idx;
@@ -505,10 +476,10 @@ namespace falcon_dsp
         while (num_out_samples < max_out_samples && new_x_idx < in_size)
         {
             /* compute the next 'cycle' updates */
-            local_t += falcon_dsp_polyphase_resampler<T, C>::m_down_rate;
-            int64_t advance_amount = local_t / falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
+            local_t += m_down_rate;
+            int64_t advance_amount = local_t / m_up_rate;
             new_x_idx += advance_amount;
-            local_t %= falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
+            local_t %= m_up_rate;
             
             /* increment trackers; assuming one output sample per thread */
             num_out_samples++;
@@ -516,12 +487,11 @@ namespace falcon_dsp
         }
     }
     
-    template<class T, class C>
-    uint32_t falcon_dsp_polyphase_resampler_cuda<T, C>::get_average_advance_in_samples(void)
+    uint32_t falcon_dsp_polyphase_resampler_cuda::get_average_advance_in_samples(void)
     {
         const uint32_t NUM_SAMPLES_TO_EVALUATE = 1e6;
 
-        uint32_t local_t = falcon_dsp_polyphase_resampler<T, C>::m_t;
+        uint32_t local_t = m_t;
         int64_t  local_x_idx = 0;
         std::vector<uint32_t> local_advances;
 
@@ -529,9 +499,9 @@ namespace falcon_dsp
         while (!reached_limit && local_x_idx < NUM_SAMPLES_TO_EVALUATE)
         {
             /* compute the next 'cycle' updates */
-            local_t += falcon_dsp_polyphase_resampler<T, C>::m_down_rate;
-            int64_t advance_amount = local_t / falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
-            local_t %= falcon_dsp_polyphase_resampler<T, C>::m_up_rate;
+            local_t += m_down_rate;
+            int64_t advance_amount = local_t / m_up_rate;
+            local_t %= m_up_rate;
             local_x_idx += advance_amount;
 
             local_advances.push_back(advance_amount);
@@ -542,11 +512,4 @@ namespace falcon_dsp
 
         return static_cast<uint32_t>(std::ceil(advance_avg));
     }
-
-    /* force instantiation for specific types */
-    template class falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>;
 }
-
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/

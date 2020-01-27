@@ -129,7 +129,7 @@ namespace falcon_dsp
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>> resampler(up_rate, down_rate, filter_coeffs);
+        falcon_dsp_polyphase_resampler_cuda resampler(up_rate, down_rate, filter_coeffs);
         
         return resampler.apply(in, out) > 0;
     }

@@ -78,6 +78,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 21-Apr-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Switched to fully specified polyphase resample
+ *                               class instead of templated class.
  *
  *****************************************************************************/
 
@@ -129,7 +131,7 @@ namespace falcon_dsp
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>> resampler(up_rate, down_rate, filter_coeffs);
+        falcon_dsp_polyphase_resampler resampler(up_rate, down_rate, filter_coeffs);
         return resampler.apply(in, out) > 0;
     }
     

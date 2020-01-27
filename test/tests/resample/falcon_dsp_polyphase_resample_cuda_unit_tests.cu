@@ -53,6 +53,8 @@
 #include <gtest/gtest.h>
 
 #include "resample/falcon_dsp_resample_cuda.h"
+#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -102,7 +104,7 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     cuda_convert_complex_int16_to_float(in_data_from_file, in_data);
     
     std::cout << "Read " << in_data.size() << " input samples from " << input_data_file_name << std::endl;
-    
+                  
     /* get the filter coefficients */
     std::vector<std::complex<float>> filter_coeffs;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_filter_coeff_file_name,
@@ -122,7 +124,7 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
     std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
     
-    auto start = std::chrono::high_resolution_clock::now();
+    falcon_dsp::falcon_dsp_host_timer timer;
     
     /* now resample the input and verify that the calculated output
      *  matches the expected output */
@@ -130,10 +132,8 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     EXPECT_TRUE(falcon_dsp::resample_cuda(input_sample_rate_in_sps, in_data, filter_coeffs,
                                           output_sample_rate_in_sps, out_data));
     
-    auto done = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_ms = done - start;
+    timer.log_duration("Filtering Complete"); timer.reset();
     
-    std::cout << "Elapsed time (in milliseconds): " << duration_ms.count() << std::endl;
     std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     EXPECT_TRUE(filter_delay < expected_out_data.size());
     EXPECT_TRUE(expected_out_data.size() >= out_data.size());
@@ -153,9 +153,144 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
             max_imag_diff = 10;
         }
 
-        //std::cout << "ii=" << ii << std::endl;
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 2.0) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 2.0) << " Error at index: " << ii;
+    }
+    
+    timer.log_duration("Data Validated");
+}
+
+TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
+{
+    /*********************************************************
+     * Test Vectors Derived from Python3:
+     *
+     * >>> x = [1, 1, 1, 1, 1, 1, 1]
+     * >>> h = [0.5, 1.0, 2.0]
+     * >>> print(signal.upfirdn(h, x, up=1, down=2))
+     * [ 0.5  3.5  3.5  3.5  2. ]
+     ********************************************************/
+    
+    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    
+    std::vector<std::complex<float>> in_data = { {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0},
+                                                 {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0} };
+    std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {3.5, 0.0}, {3.5, 0.0}, {3.5, 0.0}, {2.0, 0.0} };
+    
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
+    
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(resampler.apply(in_data, out_data));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    
+    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
+    {
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
+    }
+}
+
+TEST(falcon_dsp_resample_cuda, basic_cuda_resample_002)
+{
+    /*********************************************************
+     * Test Vectors Derived from Python3:
+     *
+     * >>> x = [1] * 1000
+     * >>> h = [0.5, 1.0, 2.0]
+     * >>> print(signal.upfirdn(h, x, up=1, down=2))
+     * [ 0.5  3.5  3.5  3.5 ... 3.5 ]
+     ********************************************************/
+    
+    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    
+    std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
+    std::vector<std::complex<float>> expected_out_data(501, std::complex<float>(3.5, 0.0));
+    expected_out_data[0] = std::complex<float>(0.5, 0.0);
+    
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
+    
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(resampler.apply(in_data, out_data));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    
+    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
+    {
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
+    }
+}
+
+TEST(falcon_dsp_resample_cuda, basic_cuda_resample_003)
+{
+    /*********************************************************
+     * Test Vectors Derived from Python3:
+     *
+     * >>> x = [1] * 1000
+     * >>> h = [0.5, 0.5, 1.0, 0.3, 0.07, 0.1, 0.4]
+     * >>> print(signal.upfirdn(h, x, up=1, down=2))
+     * [ 0.5   2.    2.37  2.87  2.87 ... 2.87  2.37  0.87  0.5 ]
+     ********************************************************/
+    
+    std::vector<std::complex<float>> coeffs = { {0.5,  0.0}, {0.5, 0.0}, {1.0, 0.0}, {0.3, 0.0},
+                                                {0.07, 0.0}, {0.1, 0.0}, {0.4, 0.0} };
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    
+    std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
+    std::vector<std::complex<float>> expected_out_data(503, std::complex<float>(2.87, 0.0));
+    expected_out_data[0] = std::complex<float>(0.5, 0.0);
+    expected_out_data[1] = std::complex<float>(2.0, 0.0);
+    expected_out_data[2] = std::complex<float>(2.37, 0.0);
+    expected_out_data[501] = std::complex<float>(2.37, 0.0);
+    expected_out_data[501] = std::complex<float>(0.87, 0.0);
+    expected_out_data[502] = std::complex<float>(0.5, 0.0);
+    
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
+    
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(resampler.apply(in_data, out_data));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    
+    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
+    {
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
+    }
+}
+
+TEST(falcon_dsp_resample_cuda, basic_cuda_resample_004)
+{
+    /*********************************************************
+     * Test Vectors Derived from Python3:
+     *
+     * >>> x = [1] * 10
+     * >>> h = [0.5, 1.0, 2.0]
+     * >>> print(signal.upfirdn(h, x, up=4, down=5))
+     * [ 0.5  1.   2.   0.   0.5  1.   2.   0. ]
+     ********************************************************/
+    
+    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(4, 5, coeffs);
+    
+    std::vector<std::complex<float>> in_data(10, std::complex<float>(1.0, 0.0));
+    std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {0.0, 0.0},
+                                                           {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {0.0, 0.0} };
+    
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 40, 50);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
+    
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(resampler.apply(in_data, out_data));
+    EXPECT_TRUE(out_data.size() >= (expected_out_data.size() - filter_delay * 3));
+    
+    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
+    {
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
     }
 }
 
@@ -230,7 +365,7 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_008)
 }
 
 /* disabling because the latest version causes a seg fault... */
-TEST(falcon_dsp_resample_cuda, DISABLED_cuda_resample_009)
+TEST(falcon_dsp_resample_cuda, cuda_resample_009)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_009_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_009.filter_coeffs.txt";

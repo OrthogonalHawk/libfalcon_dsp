@@ -56,6 +56,7 @@
 #include <gtest/gtest.h>
 
 #include "resample/falcon_dsp_resample.h"
+#include "resample/falcon_dsp_polyphase_resampler.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
@@ -160,6 +161,40 @@ void run_cpp_resample_test(std::string input_data_file_name, std::string input_f
     }
     
     timer.log_duration("Data Validated");
+}
+
+TEST(falcon_dsp_resample, basic_cpp_resample_001)
+{
+    /*********************************************************
+     * Test Vectors Derived from Python3:
+     *
+     * >>> x = [1, 1, 1, 1, 1, 1, 1]
+     * >>> h = [0.5, 1.0, 2.0]
+     * >>> print(signal.upfirdn(h, x, up=1, down=2))
+     * [ 0.5  3.5  3.5  3.5  2. ]
+     ********************************************************/
+    
+    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
+    falcon_dsp::falcon_dsp_polyphase_resampler resampler(1, 2, coeffs);
+    
+    std::vector<std::complex<float>> in_data = { {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0},
+                                                 {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0} };
+    std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {3.5, 0.0}, {3.5, 0.0}, {3.5, 0.0}, {2.0, 0.0} };
+    
+    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
+    
+    std::vector<std::complex<float>> out_data;
+    EXPECT_TRUE(resampler.apply(in_data, out_data));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    
+    std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
+    
+    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
+    {
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
+    }
 }
 
 TEST(falcon_dsp_resample, cpp_resample_004)

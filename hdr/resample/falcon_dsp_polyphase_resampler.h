@@ -104,6 +104,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 21-Apr-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Switched to fully specified class instead of
+ *                               templated class.
  *
  *****************************************************************************/
 
@@ -142,46 +144,38 @@ namespace falcon_dsp
  
     /* @brief C++ implementation of a polyphase resampler
      */
-    template<class T, class C>
     class falcon_dsp_polyphase_resampler
     {
     public:
-    
-        typedef    T input_type;
-        typedef    T output_type;
-        typedef    C coeff_type;
 
-        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
+        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate, std::vector<std::complex<float>>& filter_coeffs);
         virtual ~falcon_dsp_polyphase_resampler(void);
 
         falcon_dsp_polyphase_resampler(void) = delete;
         falcon_dsp_polyphase_resampler(const falcon_dsp_polyphase_resampler&) = delete;
 
         void reset_state(void);
-        virtual int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out);
+        virtual int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
         uint32_t        needed_out_count(uint32_t inCount);
         uint32_t        coeffs_per_phase() { return m_coeffs_per_phase; }
 
     protected:
     
+        void _manage_state(std::vector<std::complex<float>>& in);
+        
         std::mutex m_mutex;
         uint32_t   m_up_rate;
         uint32_t   m_down_rate;
 
-        std::vector<coeff_type>     m_transposed_coeffs;
-        std::vector<input_type>     m_state;
+        std::vector<std::complex<float>>     m_transposed_coeffs;
+        std::vector<std::complex<float>>     m_state;
         
-        uint32_t                    m_padded_coeff_count;  // ceil(len(coefs)/upRate)*upRate
-        uint32_t                    m_coeffs_per_phase;    // _paddedCoefCount / upRate
+        uint32_t                             m_padded_coeff_count;  // ceil(len(coefs)/upRate)*upRate
+        uint32_t                             m_coeffs_per_phase;    // _paddedCoefCount / upRate
 
-        uint32_t                    m_t;                   // "time" (modulo upRate)
-        uint32_t                    m_xOffset;
+        uint32_t                             m_t;                   // "time" (modulo upRate)
+        uint32_t                             m_xOffset;
     };
-    
-    /* specific implementation(s) of this template class; customized for these specific
-     *  templated variable types */
-    template<>
-    int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
 
 #endif // __FALCON_DSP_POLYPHASE_RESAMPLER_H__

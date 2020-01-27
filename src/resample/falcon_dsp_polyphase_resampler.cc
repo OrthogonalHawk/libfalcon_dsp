@@ -78,6 +78,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 21-Apr-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Switched to fully specified class instead of
+ *                               templated class.
  *
  *****************************************************************************/
 
@@ -108,8 +110,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace falcon_dsp
 {
-    template<class T, class C>
-    falcon_dsp_polyphase_resampler<T, C>::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate, std::vector<C>& filter_coeffs)
+    falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
+                                                                   std::vector<std::complex<float>>& filter_coeffs)
       : m_up_rate(up_rate),
         m_down_rate(down_rate),
         m_padded_coeff_count(filter_coeffs.size()),
@@ -137,12 +139,6 @@ namespace falcon_dsp
             m_transposed_coeffs.push_back(0);
         }
 
-        m_state.clear();
-        for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)
-        {
-            m_state.push_back(C(0.0, 0.0));
-        }
-
         /* This both transposes, and "flips" each phase, while
          * copying the defined coefficients into local storage.
          * There is probably a faster way to do this */
@@ -157,18 +153,20 @@ namespace falcon_dsp
                 }
             }
         }
+            
+        /* maximum state size is now known; initialize the state buffer */
+        m_state.clear();
+        m_state.resize(m_coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
     }
     
-    template<class T, class C>
-    falcon_dsp_polyphase_resampler<T, C>::~falcon_dsp_polyphase_resampler(void)
+    falcon_dsp_polyphase_resampler::~falcon_dsp_polyphase_resampler(void)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_state.clear();
         m_transposed_coeffs.clear();
     }
     
-    template<class T, class C>
-    void falcon_dsp_polyphase_resampler<T, C>::reset_state(void)
+    void falcon_dsp_polyphase_resampler::reset_state(void)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         
@@ -177,14 +175,13 @@ namespace falcon_dsp
         m_state.clear();
         for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)
         {
-            m_state.push_back(C(0.0, 0.0));
+            m_state.push_back(std::complex<float>(0.0, 0.0));
         }
         m_t = 0;
         m_xOffset = 0;
     }
     
-    template<class T, class C>
-    uint32_t falcon_dsp_polyphase_resampler<T, C>::needed_out_count(uint32_t in_count)
+    uint32_t falcon_dsp_polyphase_resampler::needed_out_count(uint32_t in_count)
     {
         /* compute how many outputs will be generated for in_count inputs */
         uint64_t np = in_count * static_cast<uint64_t>(m_up_rate);
@@ -197,91 +194,8 @@ namespace falcon_dsp
         
         return need;
     }
-
-    /* generic implementation */
-    template<class T, class C>
-    int32_t falcon_dsp_polyphase_resampler<T, C>::apply(std::vector<input_type>& in, std::vector<output_type>& out)
-    {
-        std::lock_guard<std::mutex> lock(std::mutex);
-        
-        out.clear();
-        
-        /* x_idx points to the latest processed input sample */
-        int64_t x_idx = m_xOffset;
-        while (static_cast<uint64_t>(x_idx) < in.size())
-        {
-            output_type acc = output_type(0);
-            typename std::vector<coeff_type>::iterator coeff_iter = m_transposed_coeffs.begin() + m_t * m_coeffs_per_phase;
-            
-            /* need to look back over the previous samples to compute the
-             *  current filtered value */
-            int64_t x_back_idx = x_idx - m_coeffs_per_phase + 1;
-            int64_t offset = 0 - x_back_idx;
-            
-            if (offset > 0)
-            {
-                /* need to draw from the state buffer */
-                typename std::vector<input_type>::iterator state_iter = m_state.end() - offset;
-                while (state_iter != m_state.end())
-                {
-                    acc += (*state_iter) * (*coeff_iter);
-                    state_iter++;
-                    coeff_iter++;
-                }
-                x_back_idx += offset;
-            }
-            
-            while (x_back_idx <= x_idx)
-            {
-                acc += in[x_back_idx] * *(coeff_iter);
-                x_back_idx++;
-                coeff_iter++;
-            }
-            
-            out.push_back(acc);
-            m_t += m_down_rate;
-            
-            int64_t advance_amount = m_t / m_up_rate;
-            x_idx += advance_amount;
-
-            // which phase of the filter to use
-            m_t %= m_up_rate;
-        }
-        
-        m_xOffset = x_idx - in.size();
-
-        // manage _state buffer
-        // find number of samples retained in buffer:
-        int64_t retain = m_state.size() - in.size();
-        if (retain > 0)
-        {
-            // for in.size() smaller than state buffer, copy end of buffer
-            // to beginning:
-            copy(m_state.end() - retain, m_state.end(), m_state.begin());
-            
-            // Then, copy the entire (short) input to end of buffer
-            uint32_t in_idx = 0;
-            for (uint64_t state_copy_idx = retain; state_copy_idx < m_state.size(); ++state_copy_idx)
-            {
-                m_state[state_copy_idx] = in[in_idx++];   
-            }
-        }
-        else
-        {
-            // just copy last input samples into state buffer
-            for (uint64_t state_copy_idx = 0; state_copy_idx < m_state.size(); ++state_copy_idx)
-            {
-                m_state[state_copy_idx] = in[in.size() - m_state.size() + state_copy_idx];   
-            }
-        }
-        
-        // number of samples computed
-        return out.size();
-    }
     
-    /* specific implementation for complex<float> */
-    template<>
-    int32_t falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
+    int32_t falcon_dsp_polyphase_resampler::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
@@ -314,7 +228,7 @@ namespace falcon_dsp
             }
             
             while (x_back_idx <= x_idx)
-            {
+            {                
                 /* by assuming that the filter coefficients are only real (symmetric filter) we can
                  *  bypass multiplication by the imaginary filter coefficients, which will be 0 */
                 acc += std::complex<float>(in[x_back_idx].real() * coeff_iter->real(), in[x_back_idx].imag() * coeff_iter->real());
@@ -334,6 +248,14 @@ namespace falcon_dsp
         m_xOffset = x_idx - in.size();
 
         // manage _state buffer
+        _manage_state(in);
+        
+        // number of samples computed
+        return out.size();
+    }
+    
+    void falcon_dsp_polyphase_resampler::_manage_state(std::vector<std::complex<float>>& in)
+    {
         // find number of samples retained in buffer:
         int64_t retain = m_state.size() - in.size();
         if (retain > 0)
@@ -357,13 +279,7 @@ namespace falcon_dsp
                 m_state[state_copy_idx] = in[in.size() - m_state.size() + state_copy_idx];   
             }
         }
-        
-        // number of samples computed
-        return out.size();
     }
-    
-    /* force instantiation for specific types */
-    template class falcon_dsp_polyphase_resampler<std::complex<float>, std::complex<float>>;
 }
 
 /******************************************************************************

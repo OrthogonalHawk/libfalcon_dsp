@@ -104,6 +104,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 03-Sep-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Fixing bugs with implementation and switched to
+ *                               fully specified class from templated class.
  *
  *****************************************************************************/
 
@@ -115,6 +117,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
 
 #include <complex>
+#include <cuComplex.h>
 #include <mutex>
 #include <vector>
 
@@ -132,12 +135,26 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                           FUNCTION DECLARATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
+    /******************************************************************************
+     *                           FUNCTION DECLARATION
+     *****************************************************************************/
+     
+    /* CUDA kernel function that resamples the input array */
+    __global__
+    void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                    cuFloatComplex * in, uint32_t in_len,
+                                    cuFloatComplex * out, uint32_t out_len,
+                                    uint32_t coeffs_per_phase,
+                                    uint32_t num_outputs_per_cuda_thread,
+                                    int64_t start_x_idx,
+                                    uint32_t start_t,
+                                    uint32_t start_output_idx,
+                                    uint32_t up_rate,
+                                    uint32_t down_rate);
+    
+    
     /******************************************************************************
      *                            CLASS DECLARATION
      *****************************************************************************/
@@ -147,19 +164,15 @@ namespace falcon_dsp
      *               in implementation. CUDA vs. C++ differentiation in the 'apply'
      *               method when the resampling is performed.
      */
-    template<class T, class C>
-    class falcon_dsp_polyphase_resampler_cuda : public falcon_dsp_polyphase_resampler<T, C>
+    class falcon_dsp_polyphase_resampler_cuda : public falcon_dsp_polyphase_resampler
     {
     public:
         
-        typedef    T input_type;
-        typedef    T output_type;
-        typedef    C coeff_type;
-        
-        falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate, std::vector<coeff_type>& filter_coeffs);
+        falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate,
+                                            std::vector<std::complex<float>>& filter_coeffs);
         ~falcon_dsp_polyphase_resampler_cuda(void);
         
-        int32_t apply(std::vector<input_type>& in, std::vector<output_type>& out) override;
+        int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out) override;
     
     private:
         
@@ -172,19 +185,17 @@ namespace falcon_dsp
         uint32_t get_average_advance_in_samples(void);
 
         /* variables for CUDA memory management */
-        void * m_cuda_input_samples;
-        void * m_cuda_output_samples;
-        void * m_cuda_filter_coeffs;
-
-        uint32_t m_max_num_cuda_input_samples;
-        uint32_t m_max_num_cuda_output_samples;
-        uint32_t m_avg_advance_per_output_sample;
-        uint32_t m_num_outputs_per_cuda_thread;
+        cuFloatComplex *                             m_cuda_input_samples;
+        uint32_t                                     m_max_num_cuda_input_samples;
+        
+        cuFloatComplex *                             m_cuda_output_samples;
+        uint32_t                                     m_max_num_cuda_output_samples;
+        
+        cuFloatComplex *                             m_cuda_filter_coeffs;
+        
+        uint32_t                                     m_avg_advance_per_output_sample;
+        uint32_t                                     m_num_outputs_per_cuda_thread;
     };
-    
-    /* specific implementation of this template class */
-    template <>
-    int32_t falcon_dsp_polyphase_resampler_cuda<std::complex<float>, std::complex<float>>::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 }
 
 #endif // __FALCON_DSP_POLYPHASE_RESAMPLER_CUDA_H__
