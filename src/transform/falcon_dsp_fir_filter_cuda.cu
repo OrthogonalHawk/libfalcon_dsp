@@ -60,6 +60,8 @@
 
 const bool TIMING_LOGS_ENABLED = false;
 
+const uint32_t MAX_NUM_CUDA_THREADS = 1024;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -333,20 +335,19 @@ namespace falcon_dsp
                                     cudaMemcpyHostToDevice));
         
         /* run kernel on the GPU */
-        uint32_t num_samples_per_thread = 4;
-        uint32_t thread_block_size = 256;
-        uint32_t samples_per_thread_block = num_samples_per_thread * thread_block_size;
+        uint32_t num_samples_per_thread = 1;
+        uint32_t samples_per_thread_block = num_samples_per_thread * MAX_NUM_CUDA_THREADS;
         uint32_t num_thread_blocks = (in.size() + samples_per_thread_block - 1) / samples_per_thread_block;
         
         falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_LOGS_ENABLED);
         
-        __fir_filter<<<num_thread_blocks, thread_block_size>>>(m_cuda_coeff_data,
-                                                               m_coefficients.size(),
-                                                               num_samples_per_thread,
-                                                               m_cuda_input_data,
-                                                               m_max_num_input_samples,
-                                                               m_cuda_output_data,
-                                                               m_max_num_output_samples);
+        __fir_filter<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(m_cuda_coeff_data,
+                                                                  m_coefficients.size(),
+                                                                  num_samples_per_thread,
+                                                                  m_cuda_input_data,
+                                                                  m_max_num_input_samples,
+                                                                  m_cuda_output_data,
+                                                                  m_max_num_output_samples);
         
         cudaErrChkAssert(cudaPeekAtLastError());
         
