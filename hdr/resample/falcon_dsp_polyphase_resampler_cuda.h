@@ -131,6 +131,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
 
+struct kernel_thread_params_s
+{
+    kernel_thread_params_s(int64_t x_idx, uint32_t start_t)
+      : thread_start_x_idx(x_idx),
+        thread_start_t(start_t)
+    { }
+
+    int64_t thread_start_x_idx;
+    uint32_t thread_start_t;
+};
+
 /******************************************************************************
  *                                  MACROS
  *****************************************************************************/
@@ -144,6 +155,7 @@ namespace falcon_dsp
     /* CUDA kernel function that resamples the input array */
     __global__
     void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                    kernel_thread_params_s * thread_params, uint32_t params_len,
                                     cuFloatComplex * in, uint32_t in_len,
                                     cuFloatComplex * out, uint32_t out_len,
                                     uint32_t coeffs_per_phase,
@@ -168,6 +180,14 @@ namespace falcon_dsp
     {
     public:
         
+        static bool compute_kernel_params(uint32_t up_rate, uint32_t down_rate,
+                                          int64_t start_x_idx, size_t in_size, uint32_t start_t,
+                                          uint32_t max_out_samples, uint32_t max_out_samples_per_thread,
+                                          uint32_t& num_out_samples,
+                                          uint32_t& new_t,
+                                          int64_t& new_x_idx,
+                                          std::vector<kernel_thread_params_s>& params);
+
         falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate,
                                             std::vector<std::complex<float>>& filter_coeffs);
         ~falcon_dsp_polyphase_resampler_cuda(void);
@@ -187,6 +207,8 @@ namespace falcon_dsp
         /* variables for CUDA memory management */
         cuFloatComplex *                             m_cuda_input_samples;
         uint32_t                                     m_max_num_cuda_input_samples;
+        kernel_thread_params_s *                     m_kernel_thread_params;
+        uint32_t                                     m_num_kernel_thread_params;
         
         cuFloatComplex *                             m_cuda_output_samples;
         uint32_t                                     m_max_num_cuda_output_samples;
