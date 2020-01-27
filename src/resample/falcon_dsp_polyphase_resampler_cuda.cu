@@ -99,7 +99,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                                 CONSTANTS
  *****************************************************************************/
 
-const bool TIMING_ENABLED = true;
+const bool TIMING_ENABLED = false;
 
 const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 1;
 const uint32_t MAX_NUM_CUDA_THREADS = 1024;
@@ -112,8 +112,6 @@ const uint32_t MAX_NUM_CUDA_THREADS = 1024;
  * [1] https://devtalk.nvidia.com/default/topic/1056895/jetson-nano/about-jetson-nano-device-query/
  */
 const uint32_t MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY = 6000;
-
-const uint32_t THREAD_TO_MONITOR = 1;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -158,6 +156,17 @@ namespace falcon_dsp
         while (cycles_elapsed < sleep_cycles);
     }
     
+    #define cudaErrChk(ans) { gpuAssert((ans), __FILE__, __LINE__, false); }
+    #define cudaErrChkAssert(ans) { gpuAssert((ans), __FILE__, __LINE__, true); }
+    inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=false)
+    {
+        if (code != cudaSuccess) 
+        {
+            fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+            if (abort) exit(code);
+        }
+    }
+    
     /* CUDA kernel function that resamples the input array */
     __global__
     void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
@@ -193,7 +202,8 @@ namespace falcon_dsp
         {
             uint32_t num_coefficients_per_thread = (coeffs_len / blockDim.x) + 1;
             for (uint32_t coeff_idx = threadIdx.x * num_coefficients_per_thread;
-                 coeff_idx < ((threadIdx.x * num_coefficients_per_thread) + num_coefficients_per_thread);
+                 coeff_idx < ((threadIdx.x * num_coefficients_per_thread) + num_coefficients_per_thread) &&
+                     coeff_idx < coeffs_len;
                  ++coeff_idx)
             {
                 s_coeffs[coeff_idx] = coeffs[coeff_idx];
@@ -334,13 +344,14 @@ namespace falcon_dsp
         m_num_outputs_per_cuda_thread(MAX_NUM_OUTPUTS_PER_CUDA_THREAD)
     {
         /* allocate CUDA unified memory space for filter coefficients */
-        cudaMallocManaged(&m_cuda_filter_coeffs, m_transposed_coeffs.size() * sizeof(std::complex<float>));
+        cudaErrChkAssert(cudaMallocManaged(&m_cuda_filter_coeffs,
+                                           m_transposed_coeffs.size() * sizeof(std::complex<float>)));
 
         /* copy the filter coefficients into CUDA memory */
-        cudaMemcpy(m_cuda_filter_coeffs,
-                   m_transposed_coeffs.data(),
-                   m_transposed_coeffs.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(m_cuda_filter_coeffs,
+                                    m_transposed_coeffs.data(),
+                                    m_transposed_coeffs.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyHostToDevice));
 
         /* calculate the average number of samples that are advanced for
          *  each output sample */
@@ -348,7 +359,7 @@ namespace falcon_dsp
         
        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
         *  can better handle complex<float> data, which is natively 8 bytes in size */
-       cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+       cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
     }
     
     falcon_dsp_polyphase_resampler_cuda::~falcon_dsp_polyphase_resampler_cuda(void)
@@ -357,26 +368,26 @@ namespace falcon_dsp
 
         if (m_cuda_filter_coeffs)
         {
-            cudaFree(m_cuda_filter_coeffs);
+            cudaErrChk(cudaFree(m_cuda_filter_coeffs));
             m_cuda_filter_coeffs = nullptr;
         }
 
         if (m_kernel_thread_params)
         {
-            cudaFree(m_kernel_thread_params);
+            cudaErrChk(cudaFree(m_kernel_thread_params));
             m_kernel_thread_params = nullptr;
             m_num_kernel_thread_params = 0;
         }
 
         if (m_cuda_input_samples)
         {
-            cudaFree(m_cuda_input_samples);
+            cudaErrChk(cudaFree(m_cuda_input_samples));
             m_cuda_input_samples = nullptr;
         }
 
         if (m_cuda_output_samples)
         {
-            cudaFree(m_cuda_output_samples);
+            cudaErrChk(cudaFree(m_cuda_output_samples));
             m_cuda_output_samples = nullptr;
         }
     }
@@ -410,26 +421,28 @@ namespace falcon_dsp
         {
             if (m_cuda_input_samples)
             {
-                cudaFree(m_cuda_input_samples);
+                cudaErrChkAssert(cudaFree(m_cuda_input_samples));
                 m_cuda_input_samples = nullptr;
                 m_max_num_cuda_input_samples = 0;
             }
             
             m_max_num_cuda_input_samples = in.size() + m_state.size();
-            cudaMallocManaged(&m_cuda_input_samples, m_max_num_cuda_input_samples * sizeof(std::complex<float>));
+            cudaErrChkAssert(cudaMallocManaged(&m_cuda_input_samples,
+                                               m_max_num_cuda_input_samples * sizeof(std::complex<float>)));
         }
         
         if (m_max_num_cuda_output_samples != num_outputs_from_thread_blocks)
         {
             if (m_cuda_output_samples)
             {
-                cudaFree(m_cuda_output_samples);
+                cudaErrChkAssert(cudaFree(m_cuda_output_samples));
                 m_cuda_output_samples = nullptr;
                 m_max_num_cuda_output_samples = 0;
             }
             
             m_max_num_cuda_output_samples = num_outputs_from_thread_blocks;
-            cudaMallocManaged(&m_cuda_output_samples, m_max_num_cuda_output_samples * sizeof(std::complex<float>));
+            cudaErrChkAssert(cudaMallocManaged(&m_cuda_output_samples,
+                                               m_max_num_cuda_output_samples * sizeof(std::complex<float>)));
         }
         
         /* clear out the output and allocate space for the resulting data */
@@ -453,29 +466,27 @@ namespace falcon_dsp
             }
             
             m_num_kernel_thread_params = MAX_NUM_CUDA_THREADS * num_thread_blocks;
-            cudaMallocManaged(&m_kernel_thread_params, m_num_kernel_thread_params * sizeof(kernel_thread_params_s));
+            cudaErrChkAssert(cudaMallocManaged(&m_kernel_thread_params,
+                                               m_num_kernel_thread_params * sizeof(kernel_thread_params_s)));
         }
         
         /* copy the state vector into CUDA memory */
-        cudaMemcpy(m_cuda_input_samples,
-                   m_state.data(),
-                   m_state.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(m_cuda_input_samples,
+                         m_state.data(),
+                         m_state.size() * sizeof(std::complex<float>),
+                         cudaMemcpyHostToDevice));
         
         /* copy the thread parameters into CUDA memory */
-        cudaMemcpy(m_kernel_thread_params,
-                   kernel_thread_params.data(),
-                   kernel_thread_params.size() * sizeof(kernel_thread_params_s),
-                   cudaMemcpyHostToDevice);
+        cudaErrChkAssert(cudaMemcpy(m_kernel_thread_params,
+                                    kernel_thread_params.data(),
+                                    kernel_thread_params.size() * sizeof(kernel_thread_params_s),
+                                    cudaMemcpyHostToDevice));
         
         /* copy the input samples into CUDA memory */
-        cudaMemcpy(m_cuda_input_samples + m_state.size(),
-                   in.data(),
-                   in.size() * sizeof(std::complex<float>),
-                   cudaMemcpyHostToDevice);
-
-        printf("Launching kernel with m_coeffs_per_phase=%u x_start_idx=%zu\n",
-               m_coeffs_per_phase, m_state.size());
+        cudaErrChkAssert(cudaMemcpy(m_cuda_input_samples + m_state.size(),
+                                    in.data(),
+                                    in.size() * sizeof(std::complex<float>),
+                                    cudaMemcpyHostToDevice));
         
         falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_ENABLED);
         
@@ -496,6 +507,8 @@ namespace falcon_dsp
                          m_up_rate,
                          m_down_rate);
 
+        cudaErrChkAssert(cudaPeekAtLastError());
+
         /* wait for GPU to finish before accessing on host */
         cudaDeviceSynchronize();
         
@@ -506,8 +519,6 @@ namespace falcon_dsp
                    m_cuda_output_samples + cur_out_idx,
                    num_outputs_from_thread_blocks * sizeof(std::complex<float>),
                    cudaMemcpyDeviceToHost);
-        
-        printf("Copied outputs from CUDA memory (cur_out_idx=%u)\n", cur_out_idx);
         
         /* update tracking parameters */
         m_t = new_t;
@@ -538,9 +549,6 @@ namespace falcon_dsp
         new_t = start_t;
         new_x_idx = start_x_idx;
         params.clear();
-
-        printf("compute_kernel_params start_t=%u start_x_idx=%ld\n",
-               start_t, start_x_idx);
         
         /* sanity check the inputs */
         if (max_out_samples_per_thread == 0)
@@ -559,11 +567,6 @@ namespace falcon_dsp
             {
                 params.push_back(kernel_thread_params_s(new_x_idx, new_t));
                 num_samples_in_current_thread = 0;
-                
-                if ((params.size() - 1) == (THREAD_TO_MONITOR))
-                {
-                    printf("Thread %zu: x_idx=%ld _t=%u\n", (params.size() - 1), new_x_idx, new_t);
-                }
             }
             
             /* compute the next 'cycle' updates */
@@ -574,16 +577,7 @@ namespace falcon_dsp
             num_out_samples++;
             num_samples_in_current_thread++;
         }
-        
-        printf("num_out=%u max_out=%u\n",
-              num_out_samples, max_out_samples);
-        
-        printf("new_x_idx=%ld max_size=%zu\n",
-              new_x_idx, in_size);
-        
-        //printf("Thread %u: x_idx=%ld _t=%u\n",
-        //    THREAD_TO_MONITOR, params[THREAD_TO_MONITOR].thread_start_x_idx, params[THREAD_TO_MONITOR].thread_start_t);
-        
+
         return true;
     }
     

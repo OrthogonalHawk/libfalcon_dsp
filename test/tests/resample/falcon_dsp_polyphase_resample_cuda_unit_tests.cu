@@ -61,6 +61,8 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
+const uint32_t ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER = 5;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -122,7 +124,6 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     std::cout << "Read " << expected_out_data.size() << " input files from " << expected_output_file_name << std::endl;
     
     uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
-    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
     
     falcon_dsp::falcon_dsp_host_timer timer;
     
@@ -137,7 +138,7 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     EXPECT_TRUE(filter_delay < expected_out_data.size());
     EXPECT_TRUE(expected_out_data.size() >= out_data.size());
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
     
     for (uint32_t ii = filter_delay; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {   
@@ -183,7 +184,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
     
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
     
     for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {
@@ -215,7 +216,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_002)
     
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
     
     for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {
@@ -253,7 +254,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_003)
     
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
     
     for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {
@@ -285,7 +286,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_004)
     
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() >= (expected_out_data.size() - filter_delay * 3));
+    EXPECT_TRUE(out_data.size() >= (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
     
     for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {
@@ -364,7 +365,6 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_008)
                            INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-/* disabling because the latest version causes a seg fault... */
 TEST(falcon_dsp_resample_cuda, cuda_resample_009)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_009_x.bin";

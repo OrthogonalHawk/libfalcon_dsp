@@ -151,7 +151,7 @@ namespace falcon_dsp
     /******************************************************************************
      *                           FUNCTION DECLARATION
      *****************************************************************************/
-     
+    
     /* CUDA kernel function that resamples the input array */
     __global__
     void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
