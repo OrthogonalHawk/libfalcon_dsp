@@ -3,6 +3,7 @@
 cd utilities
 mkdir -p tmp_notebooks
 
+
 # 000 - generate a ramp pattern to verify proper C/C++ file parsing
 export FREQ_SHIFT=0
 export INPUT_SAMPLE_RATE=1000000
@@ -161,5 +162,16 @@ export OUT_FILE_NAME=../vectors/test_014
 export SEED=3999
 
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_chan_freq_shift_test_vectors.ipynb --output tmp_notebooks/generate_multi_chan_freq_shift_test_vectors_014.ipynb
+
+
+# 015 - multi-rate channelizer
+export INPUT_SAMPLE_RATE=1000000
+export CHANNEL_SAMPLE_RATES=100000,250000
+export FREQ_SHIFTS=-350000,60000
+export NUM_INPUT_SAMPLES=2000000
+export OUT_FILE_NAME=../vectors/test_015
+export SEED=2020
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_rate_channelizer_test_vectors.ipynb --output tmp_notebooks/generate_multi_rate_channelizer_test_vectors_015.ipynb
 
 cd ../
