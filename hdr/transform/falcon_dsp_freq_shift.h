@@ -98,6 +98,8 @@ namespace falcon_dsp
     {
     public:
 
+        static std::pair<uint32_t, float> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
+
         falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
         virtual ~falcon_dsp_freq_shift(void) = default;
 
@@ -108,9 +110,7 @@ namespace falcon_dsp
         virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
 
     protected:
-    
-        static std::pair<uint32_t, float> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
-    
+
         std::mutex m_mutex;
         double     m_samples_handled;
         uint32_t   m_calculated_rollover_sample_idx;
