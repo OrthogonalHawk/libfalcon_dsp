@@ -150,7 +150,7 @@ namespace falcon_dsp
     /* CUDA kernel function that resamples the input array */
     __global__
     void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                    kernel_thread_params_s * thread_params, uint32_t params_len,
+                                    polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
                                     cuFloatComplex * in, uint32_t in_len,
                                     cuFloatComplex * out, uint32_t out_len,
                                     uint32_t coeffs_per_phase,
@@ -191,7 +191,7 @@ namespace falcon_dsp
         }
         
         /* retrieve local thread variables */
-        kernel_thread_params_s params = thread_params[thread_index];
+        polyphase_resampler_kernel_thread_params_s params = thread_params[thread_index];
         int64_t thread_x_idx = params.thread_start_x_idx;
         uint32_t thread_coeff_phase = params.thread_start_coeff_phase;
         
@@ -388,7 +388,7 @@ namespace falcon_dsp
         uint32_t num_outputs_from_thread_blocks = 0;
         uint32_t new_coeff_phase = m_params.coeff_phase;
         int64_t new_x_idx = x_idx;
-        std::vector<kernel_thread_params_s> kernel_thread_params;
+        std::vector<polyphase_resampler_kernel_thread_params_s> kernel_thread_params;
         compute_kernel_params(m_params.up_rate, m_params.down_rate, m_params.state.size(), in.size(), m_params.coeff_phase,
                               needed_out_count(in.size()), m_num_outputs_per_cuda_thread,
                               num_outputs_from_thread_blocks, new_coeff_phase, new_x_idx, kernel_thread_params);
@@ -445,7 +445,8 @@ namespace falcon_dsp
             
             m_num_kernel_thread_params = MAX_NUM_CUDA_THREADS * num_thread_blocks;
             cudaErrChkAssert(cudaMallocManaged(&m_kernel_thread_params,
-                                               m_num_kernel_thread_params * sizeof(kernel_thread_params_s)));
+                                               m_num_kernel_thread_params *
+                                                   sizeof(polyphase_resampler_kernel_thread_params_s)));
         }
         
         /* copy the state vector into CUDA memory */
@@ -457,7 +458,7 @@ namespace falcon_dsp
         /* copy the thread parameters into CUDA memory */
         cudaErrChkAssert(cudaMemcpy(m_kernel_thread_params,
                                     kernel_thread_params.data(),
-                                    kernel_thread_params.size() * sizeof(kernel_thread_params_s),
+                                    kernel_thread_params.size() * sizeof(polyphase_resampler_kernel_thread_params_s),
                                     cudaMemcpyHostToDevice));
         
         /* copy the input samples into CUDA memory */
@@ -517,7 +518,7 @@ namespace falcon_dsp
                                                                     uint32_t& num_out_samples,
                                                                     uint32_t& new_coeff_phase,
                                                                     int64_t& new_x_idx,
-                                                                    std::vector<kernel_thread_params_s>& params)
+                                                                    std::vector<polyphase_resampler_kernel_thread_params_s>& params)
     {
         uint32_t num_samples_in_current_thread = 0;
         
@@ -534,7 +535,7 @@ namespace falcon_dsp
         }
         
         /* always start by pushing back the initial parameters */
-        params.push_back(kernel_thread_params_s(new_x_idx, new_coeff_phase));
+        params.push_back(polyphase_resampler_kernel_thread_params_s(new_x_idx, new_coeff_phase));
         
         /* compute kernel thread parameters */
         while (num_out_samples < max_out_samples && new_x_idx < in_size)
@@ -542,7 +543,7 @@ namespace falcon_dsp
             /* periodically save off the thread params */
             if (num_samples_in_current_thread >= max_out_samples_per_thread)
             {
-                params.push_back(kernel_thread_params_s(new_x_idx, new_coeff_phase));
+                params.push_back(polyphase_resampler_kernel_thread_params_s(new_x_idx, new_coeff_phase));
                 num_samples_in_current_thread = 0;
             }
             
