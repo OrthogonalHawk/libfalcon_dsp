@@ -155,8 +155,6 @@ namespace falcon_dsp
                                     cuFloatComplex * out, uint32_t out_len,
                                     uint32_t coeffs_per_phase,
                                     uint32_t num_outputs_per_cuda_thread,
-                                    int64_t start_x_idx,
-                                    uint32_t start_coeff_phase,
                                     uint32_t start_output_idx,
                                     uint32_t up_rate,
                                     uint32_t down_rate)
@@ -481,8 +479,6 @@ namespace falcon_dsp
                          m_max_num_cuda_output_samples,
                          m_params.coeffs_per_phase,
                          m_num_outputs_per_cuda_thread,
-                         m_params.state.size(), /* x_start_idx */
-                         m_params.coeff_phase,
                          cur_out_idx,
                          m_params.up_rate,
                          m_params.down_rate);

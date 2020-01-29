@@ -110,16 +110,14 @@ namespace falcon_dsp
      *                            CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    polyphase_resampler_params_s
-    falcon_dsp_polyphase_resampler::get_resampler_params(uint32_t up_rate, uint32_t down_rate,
-                                                         const std::vector<std::complex<float>>& filter_coeffs)
+    void polyphase_resampler_params_s::initialize(uint32_t in_up_rate, uint32_t in_down_rate,
+                                                  const std::vector<std::complex<float>>& filter_coeffs)
     {
-        polyphase_resampler_params_s ret;
-        ret.up_rate = up_rate;
-        ret.down_rate = down_rate;
-        ret.padded_coeff_count = filter_coeffs.size();
-        ret.coeff_phase = 0;
-        ret.xOffset = 0;
+        up_rate = in_up_rate;
+        down_rate = in_down_rate;
+        padded_coeff_count = filter_coeffs.size();
+        coeff_phase = 0;
+        xOffset = 0;
         
         /* The coefficients are copied into local storage in a transposed, flipped
          *  arrangement.  For example, suppose up_rate is 3, and the input number
@@ -129,45 +127,53 @@ namespace falcon_dsp
          *      0, h[7], h[4], h[1],   // flipped phase 1 coefs (zero-padded)
          *      0, h[8], h[5], h[2],   // flipped phase 2 coefs (zero-padded)
          */
-        while (ret.padded_coeff_count % ret.up_rate)
+        while (padded_coeff_count % up_rate)
         {
-            ret.padded_coeff_count++;
+            padded_coeff_count++;
         }
-        ret.coeffs_per_phase = ret.padded_coeff_count / ret.up_rate;
+        coeffs_per_phase = padded_coeff_count / up_rate;
     
-        ret.transposed_coeffs.clear();
-        ret.transposed_coeffs.reserve(ret.padded_coeff_count);
-        for (uint32_t ii = 0; ii < ret.padded_coeff_count; ++ii)
+        transposed_coeffs.clear();
+        transposed_coeffs.reserve(padded_coeff_count);
+        for (uint32_t ii = 0; ii < padded_coeff_count; ++ii)
         {
-            ret.transposed_coeffs.push_back(0);
+            transposed_coeffs.push_back(0);
         }
 
         /* This both transposes, and "flips" each phase, while
          * copying the defined coefficients into local storage.
          * There is probably a faster way to do this */
-        for (uint32_t ii = 0; ii < ret.up_rate; ++ii)
+        for (uint32_t ii = 0; ii < up_rate; ++ii)
         {
-            for (uint32_t jj = 0; jj < ret.coeffs_per_phase; ++jj)
+            for (uint32_t jj = 0; jj < coeffs_per_phase; ++jj)
             {
-                if ((jj * ret.up_rate + ii) < filter_coeffs.size())
+                if ((jj * up_rate + ii) < filter_coeffs.size())
                 {
-                    ret.transposed_coeffs[(ret.coeffs_per_phase - 1 - jj) + ii * ret.coeffs_per_phase] =
-                        filter_coeffs[jj * ret.up_rate + ii];
+                    transposed_coeffs[(coeffs_per_phase - 1 - jj) + ii * coeffs_per_phase] =
+                        filter_coeffs[jj * up_rate + ii];
                 }
             }
         }
             
         /* maximum state size is now known; initialize the state buffer */
-        ret.state.clear();
-        ret.state.resize(ret.coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        state.clear();
+        state.resize(coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+    }
         
-        return ret;
+    void polyphase_resampler_params_s::reset_state(void)
+    {
+        /* reset the state information; an end-user might invoke this function if processing
+         *  non-continuous data */
+        state.clear();
+        state.resize(coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        coeff_phase = 0;
+        xOffset = 0;
     }
     
     falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
                                                                    const std::vector<std::complex<float>>& filter_coeffs)
     {
-        m_params = get_resampler_params(up_rate, down_rate, filter_coeffs);
+        m_params.initialize(up_rate, down_rate, filter_coeffs);
     }
     
     falcon_dsp_polyphase_resampler::~falcon_dsp_polyphase_resampler(void)
