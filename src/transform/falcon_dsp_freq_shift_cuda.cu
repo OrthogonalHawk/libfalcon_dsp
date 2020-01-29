@@ -468,18 +468,8 @@ namespace falcon_dsp
         {
             for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
             {
-                /* clean up existing memory */
-                if (m_freq_shift_channels[chan_idx]->out_data)
-                {
-                    cudaErrChkAssert(cudaFree(m_freq_shift_channels[chan_idx]->out_data));
-                    m_freq_shift_channels[chan_idx]->out_data = nullptr;
-                    m_freq_shift_channels[chan_idx]->out_data_len = 0;
-                }
-                
-                /* allocate CUDA unified memory space for the output data */
-                cudaErrChkAssert(cudaMallocManaged(&(m_freq_shift_channels[chan_idx]->out_data),
-                                                   in.size() * sizeof(std::complex<float>)));
-                m_freq_shift_channels[chan_idx]->out_data_len = in.size();
+                /* clean up existing memory (if necessary) and allocate new memory */
+                m_freq_shift_channels[chan_idx]->allocate_memory(in.size());
             }
         }
         

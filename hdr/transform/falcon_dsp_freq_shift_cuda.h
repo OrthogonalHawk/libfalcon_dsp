@@ -58,6 +58,7 @@
 #include <cuComplex.h>
 
 #include "transform/falcon_dsp_freq_shift.h"
+#include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -79,9 +80,28 @@ struct freq_shift_channel_s
 
     ~freq_shift_channel_s(void)
     {
+        cleanup_memory();
+    }
+
+    void allocate_memory(uint32_t input_vector_len)
+    {
         if (out_data)
         {
-            cudaFree(out_data);
+            cudaErrChk(cudaFree(out_data));
+            out_data = nullptr;
+            out_data_len = 0;
+        }
+
+        cudaErrChkAssert(cudaMallocManaged(&out_data,
+                                           input_vector_len * sizeof(std::complex<float>)));
+        out_data_len = input_vector_len;
+    }
+
+    void cleanup_memory(void)
+    {
+        if (out_data)
+        {
+            cudaErrChk(cudaFree(out_data));
             out_data = nullptr;
             out_data_len = 0;
         }
@@ -144,8 +164,7 @@ namespace falcon_dsp
     
     /* CUDA kernel function that supports multi-channel frequency shifting. */
     __global__
-    void __freq_shift_multi_chan(uint32_t num_samples_handled_previously,
-                                 freq_shift_channel_s * channels,
+    void __freq_shift_multi_chan(freq_shift_channel_s * channels,
                                  uint32_t num_channels,
                                  uint32_t num_samples_to_process_per_thread,
                                  cuFloatComplex * in_data,
