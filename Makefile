@@ -63,6 +63,7 @@ CUDA_SOURCES = \
     src/resample/falcon_dsp_resample_cuda.cu \
     src/transform/falcon_dsp_fir_filter_cuda.cu \
     src/transform/falcon_dsp_freq_shift_cuda.cu \
+    src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
     src/utilities/falcon_dsp_cuda_utils.cu \
     
 ###############################################################################
