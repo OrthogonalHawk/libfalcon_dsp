@@ -128,6 +128,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
 
+struct polyphase_resampler_params_s
+{
+    void reset_state(void)
+    {
+        /* reset the state information; an end-user might invoke this function if processing
+         *  non-continuous data */
+        state.clear();
+        state.resize(coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        coeff_phase = 0;
+        xOffset = 0;
+    }
+    
+    uint32_t                             up_rate;
+    uint32_t                             down_rate;
+    
+    std::vector<std::complex<float>>     transposed_coeffs;
+    std::vector<std::complex<float>>     state;
+        
+    uint32_t                             padded_coeff_count;  // ceil(len(coefs)/upRate)*upRate
+    uint32_t                             coeffs_per_phase;    // _paddedCoefCount / upRate
+
+    uint32_t                             coeff_phase;         // "time" (modulo upRate)
+    uint32_t                             xOffset;  
+};
+
 /******************************************************************************
  *                                  MACROS
  *****************************************************************************/
@@ -148,7 +173,11 @@ namespace falcon_dsp
     {
     public:
 
-        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate, std::vector<std::complex<float>>& filter_coeffs);
+        static polyphase_resampler_params_s get_resampler_params(uint32_t up_rate, uint32_t down_rate,
+                                                                 const std::vector<std::complex<float>>& filter_coeffs);
+
+        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
+                                       const std::vector<std::complex<float>>& filter_coeffs);
         virtual ~falcon_dsp_polyphase_resampler(void);
 
         falcon_dsp_polyphase_resampler(void) = delete;
@@ -157,24 +186,14 @@ namespace falcon_dsp
         void reset_state(void);
         virtual int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
         uint32_t        needed_out_count(uint32_t inCount);
-        uint32_t        coeffs_per_phase() { return m_coeffs_per_phase; }
+        uint32_t        coeffs_per_phase(void) { return m_params.coeffs_per_phase; }
 
     protected:
     
         void _manage_state(std::vector<std::complex<float>>& in);
         
-        std::mutex m_mutex;
-        uint32_t   m_up_rate;
-        uint32_t   m_down_rate;
-
-        std::vector<std::complex<float>>     m_transposed_coeffs;
-        std::vector<std::complex<float>>     m_state;
-        
-        uint32_t                             m_padded_coeff_count;  // ceil(len(coefs)/upRate)*upRate
-        uint32_t                             m_coeffs_per_phase;    // _paddedCoefCount / upRate
-
-        uint32_t                             m_t;                   // "time" (modulo upRate)
-        uint32_t                             m_xOffset;
+        std::mutex                           m_mutex;
+        polyphase_resampler_params_s         m_params;
     };
 }
 

@@ -104,20 +104,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                                  MACROS
  *****************************************************************************/
 
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/
-
 namespace falcon_dsp
 {
-    falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
-                                                                   std::vector<std::complex<float>>& filter_coeffs)
-      : m_up_rate(up_rate),
-        m_down_rate(down_rate),
-        m_padded_coeff_count(filter_coeffs.size()),
-        m_t(0),
-        m_xOffset(0)
+    /******************************************************************************
+     *                            CLASS IMPLEMENTATION
+     *****************************************************************************/
+    
+    polyphase_resampler_params_s
+    falcon_dsp_polyphase_resampler::get_resampler_params(uint32_t up_rate, uint32_t down_rate,
+                                                         const std::vector<std::complex<float>>& filter_coeffs)
     {
+        polyphase_resampler_params_s ret;
+        ret.up_rate = up_rate;
+        ret.down_rate = down_rate;
+        ret.padded_coeff_count = filter_coeffs.size();
+        ret.coeff_phase = 0;
+        ret.xOffset = 0;
+        
         /* The coefficients are copied into local storage in a transposed, flipped
          *  arrangement.  For example, suppose up_rate is 3, and the input number
          *  of coefficients coefCount = 10, represented as h[0], ..., h[9].
@@ -126,68 +129,64 @@ namespace falcon_dsp
          *      0, h[7], h[4], h[1],   // flipped phase 1 coefs (zero-padded)
          *      0, h[8], h[5], h[2],   // flipped phase 2 coefs (zero-padded)
          */
-        while (m_padded_coeff_count % m_up_rate)
+        while (ret.padded_coeff_count % ret.up_rate)
         {
-            m_padded_coeff_count++;
+            ret.padded_coeff_count++;
         }
-        m_coeffs_per_phase = m_padded_coeff_count / m_up_rate;
+        ret.coeffs_per_phase = ret.padded_coeff_count / ret.up_rate;
     
-        m_transposed_coeffs.clear();
-        m_transposed_coeffs.reserve(m_padded_coeff_count);
-        for (uint32_t ii = 0; ii < m_padded_coeff_count; ++ii)
+        ret.transposed_coeffs.clear();
+        ret.transposed_coeffs.reserve(ret.padded_coeff_count);
+        for (uint32_t ii = 0; ii < ret.padded_coeff_count; ++ii)
         {
-            m_transposed_coeffs.push_back(0);
+            ret.transposed_coeffs.push_back(0);
         }
 
         /* This both transposes, and "flips" each phase, while
          * copying the defined coefficients into local storage.
          * There is probably a faster way to do this */
-        for (uint32_t ii = 0; ii < m_up_rate; ++ii)
+        for (uint32_t ii = 0; ii < ret.up_rate; ++ii)
         {
-            for (uint32_t jj = 0; jj < m_coeffs_per_phase; ++jj)
+            for (uint32_t jj = 0; jj < ret.coeffs_per_phase; ++jj)
             {
-                if ((jj * m_up_rate + ii) < filter_coeffs.size())
+                if ((jj * ret.up_rate + ii) < filter_coeffs.size())
                 {
-                    m_transposed_coeffs[(m_coeffs_per_phase - 1 - jj) + ii * m_coeffs_per_phase] =
-                        filter_coeffs[jj * m_up_rate + ii];
+                    ret.transposed_coeffs[(ret.coeffs_per_phase - 1 - jj) + ii * ret.coeffs_per_phase] =
+                        filter_coeffs[jj * ret.up_rate + ii];
                 }
             }
         }
             
         /* maximum state size is now known; initialize the state buffer */
-        m_state.clear();
-        m_state.resize(m_coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        ret.state.clear();
+        ret.state.resize(ret.coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        
+        return ret;
+    }
+    
+    falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
+                                                                   const std::vector<std::complex<float>>& filter_coeffs)
+    {
+        m_params = get_resampler_params(up_rate, down_rate, filter_coeffs);
     }
     
     falcon_dsp_polyphase_resampler::~falcon_dsp_polyphase_resampler(void)
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_state.clear();
-        m_transposed_coeffs.clear();
-    }
+    { }
     
     void falcon_dsp_polyphase_resampler::reset_state(void)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         
-        /* reset the state information; an end-user might invoke this function if processing
-         *  non-continuous data */
-        m_state.clear();
-        for (uint32_t kk = 0; kk < (m_coeffs_per_phase - 1); ++kk)
-        {
-            m_state.push_back(std::complex<float>(0.0, 0.0));
-        }
-        m_t = 0;
-        m_xOffset = 0;
+        m_params.reset_state();
     }
     
     uint32_t falcon_dsp_polyphase_resampler::needed_out_count(uint32_t in_count)
     {
         /* compute how many outputs will be generated for in_count inputs */
-        uint64_t np = in_count * static_cast<uint64_t>(m_up_rate);
-        uint32_t need = np / m_down_rate;
+        uint64_t np = in_count * static_cast<uint64_t>(m_params.up_rate);
+        uint32_t need = np / m_params.down_rate;
         
-        if ((m_t + m_up_rate * m_xOffset) < (np % m_down_rate))
+        if ((m_params.coeff_phase + m_params.up_rate * m_params.xOffset) < (np % m_params.down_rate))
         {
             need++;
         }
@@ -202,22 +201,23 @@ namespace falcon_dsp
         out.clear();
         
         /* x_idx points to the latest processed input sample */
-        int64_t x_idx = m_xOffset;
+        int64_t x_idx = m_params.xOffset;
         while (static_cast<uint64_t>(x_idx) < in.size())
         {
             std::complex<float> acc = std::complex<float>(0.0, 0.0);
-            std::vector<std::complex<float>>::iterator coeff_iter = m_transposed_coeffs.begin() + m_t * m_coeffs_per_phase;
+            std::vector<std::complex<float>>::iterator coeff_iter = m_params.transposed_coeffs.begin() +
+                                                                        m_params.coeff_phase * m_params.coeffs_per_phase;
             
             /* need to look back over the previous samples to compute the
              *  current filtered value */
-            int64_t x_back_idx = x_idx - m_coeffs_per_phase + 1;
+            int64_t x_back_idx = x_idx - m_params.coeffs_per_phase + 1;
             int64_t offset = 0 - x_back_idx;
             
             if (offset > 0)
             {
                 /* need to draw from the state buffer */
-                std::vector<std::complex<float>>::iterator state_iter = m_state.end() - offset;
-                while (state_iter != m_state.end())
+                std::vector<std::complex<float>>::iterator state_iter = m_params.state.end() - offset;
+                while (state_iter != m_params.state.end())
                 {
                     /* by assuming that the filter coefficients are only real (symmetric filter) we can
                      *  bypass multiplication by the imaginary filter coefficients, which will be 0 */
@@ -236,16 +236,16 @@ namespace falcon_dsp
             }
             
             out.push_back(acc);
-            m_t += m_down_rate;
+            m_params.coeff_phase += m_params.down_rate;
             
-            int64_t advance_amount = m_t / m_up_rate;
+            int64_t advance_amount = m_params.coeff_phase / m_params.up_rate;
             x_idx += advance_amount;
 
             // which phase of the filter to use
-            m_t %= m_up_rate;
+            m_params.coeff_phase %= m_params.up_rate;
         }
         
-        m_xOffset = x_idx - in.size();
+        m_params.xOffset = x_idx - in.size();
 
         // manage _state buffer
         _manage_state(in);
@@ -257,31 +257,27 @@ namespace falcon_dsp
     void falcon_dsp_polyphase_resampler::_manage_state(std::vector<std::complex<float>>& in)
     {
         // find number of samples retained in buffer:
-        int64_t retain = m_state.size() - in.size();
+        int64_t retain = m_params.state.size() - in.size();
         if (retain > 0)
         {
             // for in.size() smaller than state buffer, copy end of buffer
             // to beginning:
-            copy(m_state.end() - retain, m_state.end(), m_state.begin());
+            copy(m_params.state.end() - retain, m_params.state.end(), m_params.state.begin());
             
             // Then, copy the entire (short) input to end of buffer
             uint32_t in_idx = 0;
-            for (uint64_t state_copy_idx = retain; state_copy_idx < m_state.size(); ++state_copy_idx)
+            for (uint64_t state_copy_idx = retain; state_copy_idx < m_params.state.size(); ++state_copy_idx)
             {
-                m_state[state_copy_idx] = in[in_idx++];   
+                m_params.state[state_copy_idx] = in[in_idx++];   
             }
         }
         else
         {
             // just copy last input samples into state buffer
-            for (uint64_t state_copy_idx = 0; state_copy_idx < m_state.size(); ++state_copy_idx)
+            for (uint64_t state_copy_idx = 0; state_copy_idx < m_params.state.size(); ++state_copy_idx)
             {
-                m_state[state_copy_idx] = in[in.size() - m_state.size() + state_copy_idx];   
+                m_params.state[state_copy_idx] = in[in.size() - m_params.state.size() + state_copy_idx];   
             }
         }
     }
 }
-
-/******************************************************************************
- *                            CLASS IMPLEMENTATION
- *****************************************************************************/

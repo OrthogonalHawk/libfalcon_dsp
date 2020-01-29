@@ -133,13 +133,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 struct kernel_thread_params_s
 {
-    kernel_thread_params_s(int64_t x_idx, uint32_t start_t)
+    kernel_thread_params_s(int64_t x_idx, uint32_t start_coeff_phase)
       : thread_start_x_idx(x_idx),
-        thread_start_t(start_t)
+        thread_start_coeff_phase(start_coeff_phase)
     { }
 
     int64_t thread_start_x_idx;
-    uint32_t thread_start_t;
+    uint32_t thread_start_coeff_phase;
 };
 
 /******************************************************************************
@@ -181,10 +181,11 @@ namespace falcon_dsp
     public:
         
         static bool compute_kernel_params(uint32_t up_rate, uint32_t down_rate,
-                                          int64_t start_x_idx, size_t in_size, uint32_t start_t,
+                                          int64_t start_x_idx, size_t in_size,
+                                          uint32_t start_coeff_phase,
                                           uint32_t max_out_samples, uint32_t max_out_samples_per_thread,
                                           uint32_t& num_out_samples,
-                                          uint32_t& new_t,
+                                          uint32_t& new_coeff_phase,
                                           int64_t& new_x_idx,
                                           std::vector<kernel_thread_params_s>& params);
 
@@ -196,10 +197,10 @@ namespace falcon_dsp
     
     private:
         
-        void compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_t,
+        void compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_coeff_phase,
                                         uint32_t max_out_samples,
                                         uint32_t& num_out_samples,
-                                        uint32_t& new_t,
+                                        uint32_t& new_coeff_phase,
                                         int64_t& new_x_idx);
 
         uint32_t get_average_advance_in_samples(void);
