@@ -155,7 +155,6 @@ namespace falcon_dsp
                                     cuFloatComplex * out, uint32_t out_len,
                                     uint32_t coeffs_per_phase,
                                     uint32_t num_outputs_per_cuda_thread,
-                                    uint32_t start_output_idx,
                                     uint32_t up_rate,
                                     uint32_t down_rate)
     {
@@ -196,7 +195,7 @@ namespace falcon_dsp
         uint32_t thread_coeff_phase = params.thread_start_coeff_phase;
         
         /* verify that this thread has at least one output to compute */
-        int64_t thread_start_output_sample_idx = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
+        int64_t thread_start_output_sample_idx = thread_index * num_outputs_per_cuda_thread;
         if (thread_start_output_sample_idx >= out_len)
         {
             return;
@@ -293,7 +292,7 @@ namespace falcon_dsp
         }
         
         /* set the global outputs */
-        uint64_t global_output_sample_idx_base = start_output_idx + (thread_index * num_outputs_per_cuda_thread);
+        uint64_t global_output_sample_idx_base = thread_index * num_outputs_per_cuda_thread;
         for (uint32_t out_sample_idx = 0;
              out_sample_idx < num_outputs_per_cuda_thread &&
                  out_samples[out_sample_idx].active;
@@ -376,7 +375,6 @@ namespace falcon_dsp
         std::lock_guard<std::mutex> lock(m_mutex);
         
         /* calculate the number of thread blocks that will be required */
-        uint32_t cur_out_idx = 0;
         int64_t x_idx = m_params.xOffset;
         uint32_t num_thread_blocks = needed_out_count(in.size()) / (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread);
         if (needed_out_count(in.size()) % (MAX_NUM_CUDA_THREADS * m_num_outputs_per_cuda_thread) != 0)
@@ -480,27 +478,25 @@ namespace falcon_dsp
                          m_max_num_cuda_output_samples,
                          m_params.coeffs_per_phase,
                          m_num_outputs_per_cuda_thread,
-                         cur_out_idx,
                          m_params.up_rate,
                          m_params.down_rate);
 
         cudaErrChkAssert(cudaPeekAtLastError());
 
         /* wait for GPU to finish before accessing on host */
-        cudaDeviceSynchronize();
+        cudaErrChkAssert(cudaDeviceSynchronize());
         
         timer.log_duration("Filtering");
         
         /* copy output samples out of CUDA memory */
-        cudaMemcpy(out.data() + cur_out_idx,
-                   m_cuda_output_samples + cur_out_idx,
-                   num_outputs_from_thread_blocks * sizeof(std::complex<float>),
-                   cudaMemcpyDeviceToHost);
+        cudaErrChkAssert(cudaMemcpy(out.data(),
+                                    m_cuda_output_samples,
+                                    num_outputs_from_thread_blocks * sizeof(std::complex<float>),
+                                    cudaMemcpyDeviceToHost));
         
         /* update tracking parameters */
         m_params.coeff_phase = new_coeff_phase;
         x_idx += new_x_idx;
-        cur_out_idx += num_outputs_from_thread_blocks; 
         m_params.xOffset = x_idx - in.size();
 
         /* finished resampling; now update the state buffer*/
