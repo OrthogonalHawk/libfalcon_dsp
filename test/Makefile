@@ -80,6 +80,7 @@ CUDA_SOURCES = \
     tests/resample/falcon_dsp_polyphase_resample_cuda_unit_tests.cu \
     tests/transform/falcon_dsp_fir_filter_cuda_unit_tests.cu \
     tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
+    tests/transform/falcon_dsp_multi_rate_channelizer_cuda_unit_tests.cu \
     unit_test_cuda_init.cu \
     
 ###############################################################################
