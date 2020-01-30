@@ -158,4 +158,13 @@ namespace falcon_dsp
 
         return out.size() > 0;
     }
+    
+    void falcon_dsp_multi_rate_channelizer::reset_state(void)
+    {
+        for (uint32_t out_chan_idx = 0; out_chan_idx < m_cpp_channels.size(); ++out_chan_idx)
+        {
+            m_cpp_channels[out_chan_idx]->freq_shifter.reset_state();
+            m_cpp_channels[out_chan_idx]->resampler.reset_state();
+        } 
+    }
 }

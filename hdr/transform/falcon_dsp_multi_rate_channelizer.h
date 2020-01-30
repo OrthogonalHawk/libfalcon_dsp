@@ -107,6 +107,8 @@ namespace falcon_dsp
 
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
 
+        void reset_state(void);
+
     private:
 
         /* define an internal, class-only structure so that we can add more information */
