@@ -59,7 +59,7 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
-const bool TIMING_LOGS_ENABLED = true;
+const bool TIMING_LOGS_ENABLED = false;
 
 const uint32_t MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_FREQ_SHIFT_KERNEL = 4;
 const uint32_t MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL = 1;
