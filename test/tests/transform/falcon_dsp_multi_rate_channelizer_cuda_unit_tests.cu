@@ -155,7 +155,7 @@ void run_cuda_multi_rate_channelizer_test(std::string input_file_name,
     std::vector<std::vector<std::complex<float>>> out_data;
     EXPECT_TRUE(channelizer.apply(in_data, out_data));
     
-    timer.log_duration("Shifting Complete"); timer.reset();
+    timer.log_duration("Channelization Complete"); timer.reset();
 
     EXPECT_EQ(out_data.size(), expected_out_data.size());
     
