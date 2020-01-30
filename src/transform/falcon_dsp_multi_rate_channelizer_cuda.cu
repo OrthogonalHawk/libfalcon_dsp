@@ -59,7 +59,7 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
-const bool TIMING_LOGS_ENABLED = false;
+const bool TIMING_LOGS_ENABLED = true;
 
 const uint32_t MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_FREQ_SHIFT_KERNEL = 4;
 const uint32_t MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL = 1;
@@ -83,21 +83,44 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::internal_multi_rate_channelizer_channel_s(void)
-      : d_resample_coeffs(nullptr),
+    falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::internal_multi_rate_channelizer_channel_s(const multi_rate_channelizer_channel_s& other)
+      : d_freq_shifted_data(nullptr),
+        freq_shifted_data_len(0),
+        d_resample_coeffs(nullptr),
         resample_coeffs_len(0),
+        d_resample_kernel_thread_params(nullptr),
+        resample_kernel_thread_params_len(0),
         d_resampled_data(nullptr),
         resampled_data_len(0)
-    { }
-    
-    falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::internal_multi_rate_channelizer_channel_s(const multi_rate_channelizer_channel_s& other)
-      : internal_multi_rate_channelizer_channel_s()
     {
         output_sample_rate_in_sps = other.output_sample_rate_in_sps;
         freq_shift_in_hz = other.freq_shift_in_hz;
+        up_rate = other.up_rate;
+        down_rate = other.down_rate;
         resample_filter_coeffs = other.resample_filter_coeffs;
-          
+
         resampler_params.initialize(up_rate, down_rate, resample_filter_coeffs);
+            
+        /* the resampler coefficients are fixed, so allocate space for them here */
+        if (resample_coeffs_len != resample_filter_coeffs.size())
+        {
+            if (d_resample_coeffs)
+            {
+                cudaErrChk(cudaFree(d_resample_coeffs));
+                d_resample_coeffs = nullptr;
+                resample_coeffs_len = 0;
+            }
+
+            resample_coeffs_len = resample_filter_coeffs.size();
+            cudaErrChkAssert(cudaMallocManaged(&d_resample_coeffs,
+                                               resample_coeffs_len * sizeof(std::complex<float>)));
+            
+            /* copy the coefficients to the GPU */
+            cudaErrChkAssert(cudaMemcpy(static_cast<void *>(d_resample_coeffs),
+                                        static_cast<void *>(resample_filter_coeffs.data()),
+                                        resample_filter_coeffs.size() * sizeof(std::complex<float>),
+                                        cudaMemcpyHostToDevice));
+        }
     }
             
     falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::~internal_multi_rate_channelizer_channel_s(void)
@@ -107,7 +130,7 @@ namespace falcon_dsp
     
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::get_num_outputs_for_input(uint32_t input_vector_len)
     {
-        /* compute how many outputs will be generated for in_count inputs */
+        /* compute how many outputs will be generated for input_vector_len inputs */
         uint64_t np = input_vector_len * static_cast<uint64_t>(resampler_params.up_rate);
         uint32_t need = np / resampler_params.down_rate;
         
@@ -124,7 +147,7 @@ namespace falcon_dsp
         return (resample_kernel_thread_params_len / MAX_NUM_CUDA_THREADS);
     }
     
-    uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::allocate_memory(uint32_t input_vector_len)
+    uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::initialize(uint32_t input_vector_len)
     {
         /* allocate space for the frequency shifted version of the input data. note that this
          *  is also the input data for resampling so it has to take into account the 
@@ -146,36 +169,16 @@ namespace falcon_dsp
                                                freq_shifted_data_len * sizeof(std::complex<float>)));
         }
 
+        /* frequency shift output memory has been allocated so update the frequency shift
+         *  output memory pointer. note that the pointer is set AFTER the state information */
+        freq_shift_chan->out_data = d_freq_shifted_data + resampler_params.state.size();
+        freq_shift_chan->out_data_len = freq_shifted_data_len - resampler_params.state.size();
+        
         /* copy the resampler state vector into CUDA memory */
         cudaErrChkAssert(cudaMemcpy(d_freq_shifted_data,
                                     resampler_params.state.data(),
                                     resampler_params.state.size() * sizeof(std::complex<float>),
                                     cudaMemcpyHostToDevice));
-        
-        /* configure the frequency shift output memory pointer to point after the state information */
-        freq_shift_chan->out_data = d_freq_shifted_data + resampler_params.state.size();
-        freq_shift_chan->out_data_len = freq_shifted_data_len - resampler_params.state.size();
-        
-        /* allocate space for the resample coefficients */
-        if (resample_coeffs_len != resample_filter_coeffs.size())
-        {
-            if (d_resample_coeffs)
-            {
-                cudaErrChk(cudaFree(d_resample_coeffs));
-                d_resample_coeffs = nullptr;
-                resample_coeffs_len = 0;
-            }
-            
-            resample_coeffs_len = resample_filter_coeffs.size();
-            cudaErrChkAssert(cudaMallocManaged(&d_resample_coeffs,
-                                               resample_coeffs_len * sizeof(std::complex<float>)));
-            
-            /* the coefficients are fixed, so copy the coefficients to the GPU */
-            cudaErrChkAssert(cudaMemcpy(static_cast<void *>(d_resample_coeffs),
-                                        static_cast<void *>(resample_filter_coeffs.data()),
-                                        resample_filter_coeffs.size() * sizeof(std::complex<float>),
-                                        cudaMemcpyHostToDevice));
-        }
         
         /* calculate the number of thread blocks that will be required for resampling */
         uint32_t expected_num_outputs = get_num_outputs_for_input(input_vector_len);
@@ -203,6 +206,12 @@ namespace falcon_dsp
                                                                                new_coeff_phase,
                                                                                new_x_idx,
                                                                                resample_kernel_thread_params);
+        
+        /* update the channel tracking information preemptively, assuming that if the user
+         *  calls the initialize method the parameters will actually be used */
+        resampler_params.coeff_phase = new_coeff_phase;
+        resample_x_idx += new_x_idx;
+        resampler_params.xOffset = resample_x_idx - input_vector_len;
         
         /* allocate space for the thread parameters */
         if (resample_kernel_thread_params_len != (MAX_NUM_CUDA_THREADS * num_resampler_thread_blocks))
@@ -246,9 +255,7 @@ namespace falcon_dsp
     }
             
     void falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::cleanup_memory(void)
-    {
-        freq_shift_chan->cleanup_memory();
-        
+    {        
         if (d_resample_coeffs)
         {
             cudaErrChk(cudaFree(d_resample_coeffs));
@@ -297,7 +304,7 @@ namespace falcon_dsp
         m_cuda_input_data(nullptr),
         m_max_num_input_samples(0),
         d_freq_shift_channels(nullptr)
-    {                                      
+    {
         /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
          *  can better handle complex<float> data, which is natively 8 bytes in size */
         cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
@@ -319,7 +326,7 @@ namespace falcon_dsp
     
     bool falcon_dsp_multi_rate_channelizer_cuda::initialize(uint32_t input_sample_rate,
                                                             std::vector<multi_rate_channelizer_channel_s> channels)
-    {
+    {        
         std::lock_guard<std::mutex> lock(std::mutex);
 
         /* sanity check the inputs and verify that the class has not already been initialized */
@@ -338,12 +345,13 @@ namespace falcon_dsp
 
         /* initialize the requested channels */
         for (auto chan_iter : channels)
-        {
+        {            
             std::unique_ptr<internal_multi_rate_channelizer_channel_s> new_chan =
                     std::make_unique<internal_multi_rate_channelizer_channel_s>(chan_iter);
-
+   
             auto freq_shift_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate,
                                                                                   chan_iter.freq_shift_in_hz);
+            
             std::unique_ptr<freq_shift_channel_s> new_freq_shift_chan = std::make_unique<freq_shift_channel_s>();
             new_freq_shift_chan->time_shift_rollover_sample_idx = freq_shift_params.first;
             new_freq_shift_chan->angular_freq = freq_shift_params.second;
@@ -400,7 +408,7 @@ namespace falcon_dsp
         /* allocate CUDA memory for the intermediate and output samples */
         for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
         {
-            m_channels[chan_idx]->allocate_memory(in.size());
+            m_channels[chan_idx]->initialize(in.size());
         }
 
         /* copy the input data to the GPU */
@@ -409,7 +417,7 @@ namespace falcon_dsp
                                     in.size() * sizeof(std::complex<float>),
                                     cudaMemcpyHostToDevice));
 
-        /* copy the channel information to the GPU */
+        /* copy the frequency shift channel information to the GPU */
         for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
         {
             cudaErrChkAssert(cudaMemcpy(static_cast<void *>(&d_freq_shift_channels[chan_idx]),
@@ -425,7 +433,7 @@ namespace falcon_dsp
                                              samples_per_freq_shift_thread_block;
 
         uint32_t freq_shift_shared_memory_size_in_bytes = sizeof(freq_shift_channel_s) * m_channels.size();
-
+        
         falcon_dsp::falcon_dsp_host_timer timer("FREQ_SHIFT KERNEL", TIMING_LOGS_ENABLED);
 
         /* run the frequency shift multi-channel kernel on the GPU */
@@ -450,7 +458,97 @@ namespace falcon_dsp
             m_channels[chan_idx]->freq_shift_chan->num_samples_handled =
                 static_cast<uint32_t>(m_channels[chan_idx]->freq_shift_chan->num_samples_handled) % m_channels[chan_idx]->freq_shift_chan->time_shift_rollover_sample_idx;
         }
+        
+        /* now resample each channel */
+        for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
+        {
+            std::stringstream resample_timer_name;
+            resample_timer_name << "RESAMP KERNEL " << chan_idx;
+            falcon_dsp::falcon_dsp_host_timer resample_timer(resample_timer_name.str(), TIMING_LOGS_ENABLED);
+        
+            __polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                             m_channels[chan_idx]->d_resample_coeffs,
+                             m_channels[chan_idx]->resample_coeffs_len,
+                             m_channels[chan_idx]->d_resample_kernel_thread_params,
+                             m_channels[chan_idx]->resample_kernel_thread_params_len,
+                             m_channels[chan_idx]->d_freq_shifted_data,
+                             m_channels[chan_idx]->freq_shifted_data_len,
+                             m_channels[chan_idx]->d_resampled_data,
+                             m_channels[chan_idx]->resampled_data_len,
+                             m_channels[chan_idx]->resampler_params.coeffs_per_phase,
+                             MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL,
+                             m_channels[chan_idx]->resampler_params.up_rate,
+                             m_channels[chan_idx]->resampler_params.down_rate);
+
+            cudaErrChkAssert(cudaPeekAtLastError());
+
+            /* wait for GPU to finish before accessing on host */
+            cudaErrChkAssert(cudaDeviceSynchronize());
+        
+            resample_timer.log_duration("Resampling Complete");
+            
+            /* copy output samples out of CUDA memory */
+            cudaErrChkAssert(cudaMemcpy(out[chan_idx].data(),
+                                        m_channels[chan_idx]->d_resampled_data,
+                                        m_channels[chan_idx]->resampled_data_len * sizeof(std::complex<float>),
+                                        cudaMemcpyDeviceToHost));
+
+            /* finished resampling; now update the resampler state buffer*/
+            _manage_resampler_state(chan_idx, in.size());
+        }
 
         return out.size() > 0;
+    }
+                             
+    void falcon_dsp_multi_rate_channelizer_cuda::_manage_resampler_state(uint32_t chan_idx, uint32_t input_vector_len)
+    {
+        /* find number of samples retained in buffer */
+        int64_t retain = m_channels[chan_idx]->resampler_params.state.size() - input_vector_len;
+        if (retain > 0)
+        {
+            /* for input_vector_len smaller than state buffer, copy end of buffer to beginning */
+            copy(m_channels[chan_idx]->resampler_params.state.end() - retain,
+                 m_channels[chan_idx]->resampler_params.state.end(),
+                 m_channels[chan_idx]->resampler_params.state.begin());
+            
+            /* then, copy the entire (short) input to end of buffer */
+            uint32_t in_idx = 0;
+            for (uint64_t state_copy_idx = retain;
+                 state_copy_idx < m_channels[chan_idx]->resampler_params.state.size();
+                 ++state_copy_idx)
+            {
+                /* compute the next index to copy. note that here we need to account for the
+                 *  state buffer padding that was added to the resampler input */
+                uint32_t next_idx_to_copy = in_idx + m_channels[chan_idx]->resampler_params.state.size();
+                
+                /* copy over the state information */
+                cudaErrChkAssert(cudaMemcpy(m_channels[chan_idx]->resampler_params.state.data() + state_copy_idx,
+                                            m_channels[chan_idx]->d_freq_shifted_data + next_idx_to_copy,
+                                            sizeof(std::complex<float>),
+                                            cudaMemcpyDeviceToHost));
+                
+                /* keep working through the resampler input buffer */
+                in_idx++;
+            }
+        }
+        else
+        {
+            /* just copy last input samples into state buffer */
+            for (uint64_t state_copy_idx = 0;
+                 state_copy_idx < m_channels[chan_idx]->resampler_params.state.size();
+                 ++state_copy_idx)
+            {
+                /* compute the next index to copy. note that here we need to account for the
+                 *  state buffer padding that was added to the resampler input */
+                uint32_t next_idx_to_copy = m_channels[chan_idx]->resampled_data_len -
+                                                m_channels[chan_idx]->resampler_params.state.size() +
+                                                state_copy_idx;
+                
+                cudaErrChkAssert(cudaMemcpy(m_channels[chan_idx]->resampler_params.state.data() + state_copy_idx,
+                                            m_channels[chan_idx]->d_resampled_data + next_idx_to_copy,
+                                            sizeof(std::complex<float>),
+                                            cudaMemcpyDeviceToHost));
+            }
+        }
     }
 }

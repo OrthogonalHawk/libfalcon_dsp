@@ -113,18 +113,21 @@ namespace falcon_dsp
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
 
     private:
+    
+        void _manage_resampler_state(uint32_t chan_idx, uint32_t input_vector_len);
 
         /* define an internal, class-only structure so that we can add more information
          *  to is, such as CUDA memory management variables */
         struct internal_multi_rate_channelizer_channel_s : multi_rate_channelizer_channel_s
         {
+            internal_multi_rate_channelizer_channel_s(void) = delete;
             internal_multi_rate_channelizer_channel_s(const multi_rate_channelizer_channel_s& other);            
             ~internal_multi_rate_channelizer_channel_s(void);
             
             uint32_t get_num_outputs_for_input(uint32_t input_vector_len);
             uint32_t get_num_resampler_thread_blocks(void);
 
-            uint32_t allocate_memory(uint32_t input_vector_len);
+            uint32_t initialize(uint32_t input_vector_len);
             void cleanup_memory(void);
             
             std::unique_ptr<freq_shift_channel_s>                   freq_shift_chan;
@@ -146,7 +149,7 @@ namespace falcon_dsp
 
         private:
         
-            internal_multi_rate_channelizer_channel_s(void);
+            
         };
 
         std::mutex                                            m_mutex;
