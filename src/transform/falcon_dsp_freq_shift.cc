@@ -136,6 +136,30 @@ namespace falcon_dsp
         return out.size() > 0;
     }
     
+    bool falcon_dsp_freq_shift::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
+    {
+        std::lock_guard<std::mutex> lock(std::mutex);
+        
+        out.clear();
+        
+        for (auto it = in.begin(); it != in.end(); ++it)
+        {
+            float angle = m_angular_freq * m_samples_handled;
+            out.push_back(std::complex<float>((*it).real(), (*it).imag()) *
+                          std::complex<float>(cos(angle),
+                                              sin(angle)));
+            
+            m_samples_handled++;            
+            
+            if (m_samples_handled >= m_calculated_rollover_sample_idx)
+            {
+                m_samples_handled = 0;
+            }
+        }
+        
+        return out.size() > 0;
+    }
+    
     std::pair<uint32_t, float> falcon_dsp_freq_shift::get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
     {
         /* Frequency shift by multiplying by a complex sinusoid: e^(jwt) = cos(wt) + jsin(wt)
