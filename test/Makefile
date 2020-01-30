@@ -53,6 +53,7 @@ CC_SOURCES = \
     ../src/transform/falcon_dsp_freq_shift.cc \
     ../src/transform/falcon_dsp_fir_filter.cc \
     ../src/transform/falcon_dsp_iir_filter.cc \
+    ../src/transform/falcon_dsp_multi_rate_channelizer.cc \
     ../src/transform/falcon_dsp_polar_discriminator.cc \
     ../src/utilities/falcon_dsp_host_timer.cc \
     ../src/utilities/falcon_dsp_utils.cc \
