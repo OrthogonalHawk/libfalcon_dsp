@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 29-Jan-2020  OrthogonalHawk  File created.
+ * 30-Jan-2020  OrthogonalHawk  Adding more tests.
  *
  *****************************************************************************/
 
@@ -185,6 +186,69 @@ TEST(falcon_dsp_multi_rate_channelizer, cpp_multi_rate_chan_015)
     std::vector<uint32_t> sample_rates = { 250000, 100000 };
     std::vector<std::pair<uint32_t, uint32_t>> up_down_rates = { {1, 4}, {1, 10} };
     std::vector<int32_t> freq_shifts = { 60000, -350000 };
+    
+    run_cpp_multi_rate_channelizer_test(IN_TEST_FILE_NAME,
+                                        IN_RESAMPLE_COEFFS_BASE_FILE_NAME,
+                                        OUT_TEST_FILE_BASE_NAME,
+                                        INPUT_SAMPLE_RATE_IN_SPS,
+                                        sample_rates,
+                                        up_down_rates,
+                                        freq_shifts);
+}
+
+TEST(falcon_dsp_multi_rate_channelizer, cpp_multi_rate_chan_016)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_016_x.bin";
+    std::string IN_RESAMPLE_COEFFS_BASE_FILE_NAME = "vectors/test_016_resamp_coeffs_";
+    std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_016_y_shift_";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 2e6;
+    std::vector<uint32_t> sample_rates = { 300000, 125000, 45000, 770000, 25000 };
+    std::vector<std::pair<uint32_t, uint32_t>> up_down_rates = { {3, 20}, {1, 16}, {9, 400}, {77, 200}, {1, 80} };
+    std::vector<int32_t> freq_shifts = { -400000, -50000, 10000, 27000, 334000 };
+    
+    run_cpp_multi_rate_channelizer_test(IN_TEST_FILE_NAME,
+                                        IN_RESAMPLE_COEFFS_BASE_FILE_NAME,
+                                        OUT_TEST_FILE_BASE_NAME,
+                                        INPUT_SAMPLE_RATE_IN_SPS,
+                                        sample_rates,
+                                        up_down_rates,
+                                        freq_shifts);
+}
+
+TEST(falcon_dsp_multi_rate_channelizer, cpp_multi_rate_chan_017)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_017_x.bin";
+    std::string IN_RESAMPLE_COEFFS_BASE_FILE_NAME = "vectors/test_017_resamp_coeffs_";
+    std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_017_y_shift_";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 30720000;
+    std::vector<uint32_t> sample_rates = { 1920000, 1920000, 1920000, 1920000, 1920000, 1920000, 1920000, 1920000, 1920000, 1920000, 1920000 };
+    std::vector<std::pair<uint32_t, uint32_t>> up_down_rates(11, {1, 16});
+    std::vector<int32_t> freq_shifts = { -5000000, -4000000, -3000000, -2000000, -1000000, 1000, 1000000, 2000000, 3000000, 4000000, 5000000 };
+    
+    run_cpp_multi_rate_channelizer_test(IN_TEST_FILE_NAME,
+                                        IN_RESAMPLE_COEFFS_BASE_FILE_NAME,
+                                        OUT_TEST_FILE_BASE_NAME,
+                                        INPUT_SAMPLE_RATE_IN_SPS,
+                                        sample_rates,
+                                        up_down_rates,
+                                        freq_shifts);
+}
+
+TEST(falcon_dsp_multi_rate_channelizer, cpp_multi_rate_chan_018)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_018_x.bin";
+    std::string IN_RESAMPLE_COEFFS_BASE_FILE_NAME = "vectors/test_018_resamp_coeffs_";
+    std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_018_y_shift_";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 30720000;
+    std::vector<uint32_t> sample_rates(11, 3686400);
+    std::vector<std::pair<uint32_t, uint32_t>> up_down_rates(11, {3, 25});
+    std::vector<int32_t> freq_shifts = { -5000000, -4000000, -3000000, -2000000, -1000000, 1000, 1000000, 2000000, 3000000, 4000000, 5000000 };
     
     run_cpp_multi_rate_channelizer_test(IN_TEST_FILE_NAME,
                                         IN_RESAMPLE_COEFFS_BASE_FILE_NAME,

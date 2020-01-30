@@ -3,7 +3,6 @@
 cd utilities
 mkdir -p tmp_notebooks
 
-
 # 000 - generate a ramp pattern to verify proper C/C++ file parsing
 export FREQ_SHIFT=0
 export INPUT_SAMPLE_RATE=1000000
@@ -173,5 +172,39 @@ export OUT_FILE_NAME=../vectors/test_015
 export SEED=2020
 
 jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_rate_channelizer_test_vectors.ipynb --output tmp_notebooks/generate_multi_rate_channelizer_test_vectors_015.ipynb
+
+
+# 016 - multi-rate channelizer
+export INPUT_SAMPLE_RATE=2000000
+export CHANNEL_SAMPLE_RATES=300000,125000,45000,770000,25000
+export FREQ_SHIFTS=-400000,-50000,10000,27000,334000
+export NUM_INPUT_SAMPLES=1000000
+export OUT_FILE_NAME=../vectors/test_016
+export SEED=2021
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_rate_channelizer_test_vectors.ipynb --output tmp_notebooks/generate_multi_rate_channelizer_test_vectors_016.ipynb
+
+
+# 017 - multi-rate channelizer
+export INPUT_SAMPLE_RATE=30720000
+export CHANNEL_SAMPLE_RATES=1920000,1920000,1920000,1920000,1920000,1920000,1920000,1920000,1920000,1920000,1920000
+export FREQ_SHIFTS=-5000000,-4000000,-3000000,-2000000,-1000000,1000,1000000,2000000,3000000,4000000,5000000
+export NUM_INPUT_SAMPLES=3072000
+export OUT_FILE_NAME=../vectors/test_017
+export SEED=2022
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_rate_channelizer_test_vectors.ipynb --output tmp_notebooks/generate_multi_rate_channelizer_test_vectors_017.ipynb
+
+
+# 018 - multi-rate channelizer
+export INPUT_SAMPLE_RATE=30720000
+export CHANNEL_SAMPLE_RATES=3686400,3686400,3686400,3686400,3686400,3686400,3686400,3686400,3686400,3686400,3686400
+export FREQ_SHIFTS=-5000000,-4000000,-3000000,-2000000,-1000000,1000,1000000,2000000,3000000,4000000,5000000
+export NUM_INPUT_SAMPLES=3072000
+export OUT_FILE_NAME=../vectors/test_018
+export SEED=2023
+
+jupyter nbconvert --to notebook --ExecutePreprocessor.timeout=3600 --execute generate_multi_rate_channelizer_test_vectors.ipynb --output tmp_notebooks/generate_multi_rate_channelizer_test_vectors_018.ipynb
+
 
 cd ../
