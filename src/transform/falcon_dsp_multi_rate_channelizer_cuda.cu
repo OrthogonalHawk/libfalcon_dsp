@@ -499,7 +499,16 @@ namespace falcon_dsp
 
         return out.size() > 0;
     }
-                             
+
+    void falcon_dsp_multi_rate_channelizer_cuda::reset_state(void)
+    {
+        for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
+        {
+            m_channels[chan_idx]->freq_shift_chan->reset_state();
+            m_channels[chan_idx]->resampler_params.reset_state();
+        }
+    }
+
     void falcon_dsp_multi_rate_channelizer_cuda::_manage_resampler_state(uint32_t chan_idx, uint32_t input_vector_len)
     {
         /* find number of samples retained in buffer */

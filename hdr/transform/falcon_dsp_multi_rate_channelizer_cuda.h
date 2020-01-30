@@ -112,6 +112,8 @@ namespace falcon_dsp
 
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
 
+        void reset_state(void);
+
     private:
     
         void _manage_resampler_state(uint32_t chan_idx, uint32_t input_vector_len);

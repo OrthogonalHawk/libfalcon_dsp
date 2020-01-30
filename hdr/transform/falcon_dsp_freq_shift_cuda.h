@@ -107,6 +107,11 @@ struct freq_shift_channel_s
         }
     }
 
+    void reset_state(void)
+    {
+        num_samples_handled = 0;
+    }
+
     uint64_t num_samples_handled;
     uint32_t time_shift_rollover_sample_idx;
     double angular_freq;
