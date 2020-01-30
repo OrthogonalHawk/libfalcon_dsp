@@ -56,8 +56,8 @@
 #include <mutex>
 #include <vector>
 
-#include "resample/falcon_dsp_polyphase_resampler.h"
 #include "transform/falcon_dsp_freq_shift.h"
+#include "transform/falcon_dsp_polyphase_resampler.h"
 
 /******************************************************************************
  *                                 CONSTANTS

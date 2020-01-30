@@ -91,7 +91,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <numeric>
 #include <stdint.h>
 
-#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "transform/falcon_dsp_polyphase_resampler_cuda.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 #include "utilities/falcon_dsp_cuda_utils.h"

@@ -47,7 +47,7 @@
 
 #include <stdint.h>
 
-#include "falcon_dsp_math.h"
+#include "math/falcon_dsp_math.h"
 
 /******************************************************************************
  *                                 CONSTANTS

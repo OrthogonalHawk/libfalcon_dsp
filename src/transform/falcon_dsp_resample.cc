@@ -65,19 +65,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /******************************************************************************
  *
- * @file     falcon_dsp_resample_cuda.cu
+ * @file     falcon_dsp_resample.cc
  * @author   OrthogonalHawk
- * @date     03-Sep-2019
+ * @date     21-Apr-2019
  *
- * @brief    CUDA implementation of a polyphase resampler.
+ * @brief    C++ implementation of a polyphase resampler.
  *
  * @section  DESCRIPTION
  *
- * Implements CUDA version of a polyphase resampler.
+ * Implements C++ version of a polyphase resampler.
  *
  * @section  HISTORY
  *
- * 03-Sep-2019  OrthogonalHawk  File created.
+ * 21-Apr-2019  OrthogonalHawk  File created.
+ * 24-Jan-2020  OrthogonalHawk  Switched to fully specified polyphase resample
+ *                               class instead of templated class.
  *
  *****************************************************************************/
 
@@ -88,7 +90,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <stdint.h>
 
-#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "transform/falcon_dsp_polyphase_resampler.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
@@ -109,7 +111,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace falcon_dsp
 {
-    /* @brief Generic CUDA resampling operation.
+    /* @brief Generic C/C++ resampling operation.
      * @param[in] in_sample_rate_in_sps  - input vector sample rate in samples
      *                                      per second.
      * @param[in] in                     - input vector
@@ -120,7 +122,7 @@ namespace falcon_dsp
      * @return True if the input vector was resampled as requested;
      *          false otherwise.
      */
-    bool resample_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+    bool resample(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                   std::vector<std::complex<float>>& filter_coeffs,
                   uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out)
     {
@@ -129,20 +131,19 @@ namespace falcon_dsp
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler_cuda resampler(up_rate, down_rate, filter_coeffs);
-        
+        falcon_dsp_polyphase_resampler resampler(up_rate, down_rate, filter_coeffs);
         return resampler.apply(in, out) > 0;
     }
     
-    /* @brief Same implementation as 'resample_cuda', just with a different name. The "up"
+    /* @brief Same implementation as 'resample', just with a different name. The "up"
      *         refers to "upsampling", followed by "fir" or Finite Impulse Response (FIR)
      *         filtering, and then "downsampling" (i.e. "dn").
      */
-    bool upfirdn_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
-                      std::vector<std::complex<float>>& filter_coeffs,
-                      uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out)
+    bool upfirdn(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
+                 std::vector<std::complex<float>>& filter_coeffs,
+                 uint32_t out_sample_rate_in_sps, std::vector<std::complex<float>>& out)
     {
-        return resample_cuda(in_sample_rate_in_sps, in, filter_coeffs, out_sample_rate_in_sps, out);
+        return resample(in_sample_rate_in_sps, in, filter_coeffs, out_sample_rate_in_sps, out);
     }
 }
 

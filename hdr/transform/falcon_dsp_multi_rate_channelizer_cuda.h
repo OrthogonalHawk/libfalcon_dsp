@@ -58,8 +58,8 @@
 
 #include <cuComplex.h>
 
-#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
 #include "transform/falcon_dsp_freq_shift_cuda.h"
+#include "transform/falcon_dsp_polyphase_resampler_cuda.h"
 #include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************

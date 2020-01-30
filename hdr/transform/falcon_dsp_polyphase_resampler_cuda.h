@@ -121,7 +121,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mutex>
 #include <vector>
 
-#include "resample/falcon_dsp_polyphase_resampler.h"
+#include "transform/falcon_dsp_polyphase_resampler.h"
 
 /******************************************************************************
  *                                 CONSTANTS

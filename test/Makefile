@@ -48,22 +48,22 @@ EXE = bin/falcon_dsp_unit_tests
 
 CC_SOURCES = \
     ../src/math/falcon_dsp_add.cc \
-    ../src/resample/falcon_dsp_resample.cc \
-    ../src/resample/falcon_dsp_polyphase_resampler.cc \
     ../src/transform/falcon_dsp_freq_shift.cc \
     ../src/transform/falcon_dsp_fir_filter.cc \
+    ../src/utilities/falcon_dsp_host_timer.cc \
     ../src/transform/falcon_dsp_iir_filter.cc \
     ../src/transform/falcon_dsp_multi_rate_channelizer.cc \
     ../src/transform/falcon_dsp_polar_discriminator.cc \
-    ../src/utilities/falcon_dsp_host_timer.cc \
+    ../src/transform/falcon_dsp_polyphase_resampler.cc \
+    ../src/transform/falcon_dsp_resample.cc \
     ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_unit_tests.cc \
-    tests/resample/falcon_dsp_polyphase_resample_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_fir_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_iir_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_multi_rate_channelizer_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_polar_discriminator_cpp_unit_tests.cc \
+    tests/transform/falcon_dsp_polyphase_resample_cpp_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
@@ -71,16 +71,16 @@ CC_SOURCES = \
     
 CUDA_SOURCES = \
     ../src/math/falcon_dsp_add_cuda.cu \
-    ../src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
-    ../src/resample/falcon_dsp_resample_cuda.cu \
     ../src/transform/falcon_dsp_fir_filter_cuda.cu \
     ../src/transform/falcon_dsp_freq_shift_cuda.cu \
     ../src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
+    ../src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
+    ../src/transform/falcon_dsp_resample_cuda.cu \
     ../src/utilities/falcon_dsp_cuda_utils.cu \
-    tests/resample/falcon_dsp_polyphase_resample_cuda_unit_tests.cu \
     tests/transform/falcon_dsp_fir_filter_cuda_unit_tests.cu \
     tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
     tests/transform/falcon_dsp_multi_rate_channelizer_cuda_unit_tests.cu \
+    tests/transform/falcon_dsp_polyphase_resample_cuda_unit_tests.cu \
     unit_test_cuda_init.cu \
     
 ###############################################################################
@@ -98,8 +98,6 @@ CPPFLAGS += -std=c++11 -O3
 
 INC_PATH += \
     -I../hdr \
-    -I../hdr/math \
-    -I../hdr/resample \
     -I/usr/src/googletest/googletest \
     -I/usr/src/googletest/googlemock \
 

@@ -48,23 +48,23 @@ LIB = lib/libfalcon_dsp$(LIB_SUFFIX).a
 
 CC_SOURCES = \
     src/math/falcon_dsp_add.cc \
-    src/resample/falcon_dsp_polyphase_resampler.cc \
-    src/resample/falcon_dsp_resample.cc \
     src/transform/falcon_dsp_freq_shift.cc \
     src/transform/falcon_dsp_fir_filter.cc \
     src/transform/falcon_dsp_iir_filter.cc \
     src/transform/falcon_dsp_multi_rate_channelizer.cc \
     src/transform/falcon_dsp_polar_discriminator.cc \
+    src/transform/falcon_dsp_polyphase_resampler.cc \
+    src/transform/falcon_dsp_resample.cc \
     src/utilities/falcon_dsp_host_timer.cc \
     src/utilities/falcon_dsp_utils.cc \
     
 CUDA_SOURCES = \
     src/math/falcon_dsp_add_cuda.cu \
-    src/resample/falcon_dsp_polyphase_resampler_cuda.cu \
-    src/resample/falcon_dsp_resample_cuda.cu \
     src/transform/falcon_dsp_fir_filter_cuda.cu \
     src/transform/falcon_dsp_freq_shift_cuda.cu \
     src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
+    src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
+    src/transform/falcon_dsp_resample_cuda.cu \
     src/utilities/falcon_dsp_cuda_utils.cu \
     
 ###############################################################################
@@ -82,7 +82,5 @@ CPPFLAGS += -std=c++11 -O3
 
 INC_PATH += \
     -I./hdr \
-    -I./hdr/math \
-    -I./hdr/resample
     
 NVCCFLAGS += $(INC_PATH)

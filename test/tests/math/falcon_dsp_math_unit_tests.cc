@@ -51,7 +51,7 @@
 
 #include <gtest/gtest.h>
 
-#include "falcon_dsp_math.h"
+#include "math/falcon_dsp_math.h"
 
 /******************************************************************************
  *                                 CONSTANTS

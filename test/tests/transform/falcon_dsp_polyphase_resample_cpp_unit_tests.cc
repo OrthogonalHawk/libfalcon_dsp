@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 OrthogonalHawk
+ * Copyright (c) 2020 OrthogonalHawk
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -25,9 +25,9 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_polyphase_resample_cuda_unit_tests.cc
+ * @file     falcon_dsp_polyphase_resample_cpp_unit_tests.cc
  * @author   OrthogonalHawk
- * @date     03-Sep-2019
+ * @date     25-Aug-2019
  *
  * @brief    Unit tests that exercise the FALCON DSP polyphase resampling functions.
  *
@@ -38,7 +38,10 @@
  *
  * @section  HISTORY
  *
- * 03-Sep-2019  OrthogonalHawk  File created.
+ * 25-Aug-2019  OrthogonalHawk  File created.
+ * 20-Jan-2020  OrthogonalHawk  Adding cpp_resample_009 and updating to reflect
+ *                               library refactoring. Also renamed to include 'cpp'
+ *                               substring in file name.
  *
  *****************************************************************************/
 
@@ -52,16 +55,14 @@
 
 #include <gtest/gtest.h>
 
-#include "resample/falcon_dsp_resample_cuda.h"
-#include "resample/falcon_dsp_polyphase_resampler_cuda.h"
+#include "transform/falcon_dsp_resample.h"
+#include "transform/falcon_dsp_polyphase_resampler.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
  *****************************************************************************/
-
-const uint32_t ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER = 5;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -79,7 +80,7 @@ const uint32_t ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER = 5;
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-void cuda_convert_complex_int16_to_float(std::vector<std::complex<int16_t>> &in,
+void convert_complex_int16_to_float(std::vector<std::complex<int16_t>> &in,
                                     std::vector<std::complex<float>> &out)
 {
     /* clear the output and reserve sufficient size for the new data */
@@ -93,9 +94,9 @@ void cuda_convert_complex_int16_to_float(std::vector<std::complex<int16_t>> &in,
     }
 }
 
-void run_cuda_resample_test(std::string input_data_file_name, std::string input_filter_coeff_file_name,
-                            std::string expected_output_file_name,
-                            uint32_t input_sample_rate_in_sps, uint32_t output_sample_rate_in_sps)
+void run_cpp_resample_test(std::string input_data_file_name, std::string input_filter_coeff_file_name,
+                           std::string expected_output_file_name,
+                           uint32_t input_sample_rate_in_sps, uint32_t output_sample_rate_in_sps)
 {
     /* get the data to resample; note that it must be read from the file as int16_t
      *  and then converted to float */
@@ -103,10 +104,10 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_data_file_name,
                                                         falcon_dsp::file_type_e::BINARY, in_data_from_file));
     std::vector<std::complex<float>> in_data;
-    cuda_convert_complex_int16_to_float(in_data_from_file, in_data);
+    convert_complex_int16_to_float(in_data_from_file, in_data);
     
     std::cout << "Read " << in_data.size() << " input samples from " << input_data_file_name << std::endl;
-                  
+    
     /* get the filter coefficients */
     std::vector<std::complex<float>> filter_coeffs;
     EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(input_filter_coeff_file_name,
@@ -119,26 +120,27 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
                                                         falcon_dsp::file_type_e::BINARY, expected_out_data_from_file));
     
     std::vector<std::complex<float>> expected_out_data;
-    cuda_convert_complex_int16_to_float(expected_out_data_from_file, expected_out_data);
+    convert_complex_int16_to_float(expected_out_data_from_file, expected_out_data);
     
     std::cout << "Read " << expected_out_data.size() << " input files from " << expected_output_file_name << std::endl;
     
     uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(filter_coeffs.size(), input_sample_rate_in_sps, output_sample_rate_in_sps);
+    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
     
     falcon_dsp::falcon_dsp_host_timer timer;
     
     /* now resample the input and verify that the calculated output
      *  matches the expected output */
     std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(falcon_dsp::resample_cuda(input_sample_rate_in_sps, in_data, filter_coeffs,
-                                          output_sample_rate_in_sps, out_data));
+    EXPECT_TRUE(falcon_dsp::resample(input_sample_rate_in_sps, in_data, filter_coeffs,
+                                     output_sample_rate_in_sps, out_data));
     
     timer.log_duration("Filtering Complete"); timer.reset();
     
     std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     EXPECT_TRUE(filter_delay < expected_out_data.size());
     EXPECT_TRUE(expected_out_data.size() >= out_data.size());
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
     
     for (uint32_t ii = filter_delay; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {   
@@ -154,14 +156,14 @@ void run_cuda_resample_test(std::string input_data_file_name, std::string input_
             max_imag_diff = 10;
         }
 
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 2.0) << " Error at index: " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 2.0) << " Error at index: " << ii;
+        EXPECT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), max_real_diff);
+        EXPECT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), max_imag_diff);
     }
     
     timer.log_duration("Data Validated");
 }
 
-TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
+TEST(falcon_dsp_resample, basic_cpp_resample_001)
 {
     /*********************************************************
      * Test Vectors Derived from Python3:
@@ -173,7 +175,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
      ********************************************************/
     
     std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler resampler(1, 2, coeffs);
     
     std::vector<std::complex<float>> in_data = { {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0},
                                                  {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0} };
@@ -184,7 +186,9 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
     
     std::vector<std::complex<float>> out_data;
     EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
+    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * 3));
+    
+    std::cout << "Resampled output has " << out_data.size() << " samples" << std::endl;
     
     for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
     {
@@ -193,109 +197,7 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
     }
 }
 
-TEST(falcon_dsp_resample_cuda, basic_cuda_resample_002)
-{
-    /*********************************************************
-     * Test Vectors Derived from Python3:
-     *
-     * >>> x = [1] * 1000
-     * >>> h = [0.5, 1.0, 2.0]
-     * >>> print(signal.upfirdn(h, x, up=1, down=2))
-     * [ 0.5  3.5  3.5  3.5 ... 3.5 ]
-     ********************************************************/
-    
-    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
-    
-    std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
-    std::vector<std::complex<float>> expected_out_data(501, std::complex<float>(3.5, 0.0));
-    expected_out_data[0] = std::complex<float>(0.5, 0.0);
-    
-    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
-    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
-    
-    std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
-    
-    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
-    {
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
-    }
-}
-
-TEST(falcon_dsp_resample_cuda, basic_cuda_resample_003)
-{
-    /*********************************************************
-     * Test Vectors Derived from Python3:
-     *
-     * >>> x = [1] * 1000
-     * >>> h = [0.5, 0.5, 1.0, 0.3, 0.07, 0.1, 0.4]
-     * >>> print(signal.upfirdn(h, x, up=1, down=2))
-     * [ 0.5   2.    2.37  2.87  2.87 ... 2.87  2.37  0.87  0.5 ]
-     ********************************************************/
-    
-    std::vector<std::complex<float>> coeffs = { {0.5,  0.0}, {0.5, 0.0}, {1.0, 0.0}, {0.3, 0.0},
-                                                {0.07, 0.0}, {0.1, 0.0}, {0.4, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
-    
-    std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
-    std::vector<std::complex<float>> expected_out_data(503, std::complex<float>(2.87, 0.0));
-    expected_out_data[0] = std::complex<float>(0.5, 0.0);
-    expected_out_data[1] = std::complex<float>(2.0, 0.0);
-    expected_out_data[2] = std::complex<float>(2.37, 0.0);
-    expected_out_data[501] = std::complex<float>(2.37, 0.0);
-    expected_out_data[501] = std::complex<float>(0.87, 0.0);
-    expected_out_data[502] = std::complex<float>(0.5, 0.0);
-    
-    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 10, 5);
-    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
-    
-    std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() > (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
-    
-    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
-    {
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
-    }
-}
-
-TEST(falcon_dsp_resample_cuda, basic_cuda_resample_004)
-{
-    /*********************************************************
-     * Test Vectors Derived from Python3:
-     *
-     * >>> x = [1] * 10
-     * >>> h = [0.5, 1.0, 2.0]
-     * >>> print(signal.upfirdn(h, x, up=4, down=5))
-     * [ 0.5  1.   2.   0.   0.5  1.   2.   0. ]
-     ********************************************************/
-    
-    std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(4, 5, coeffs);
-    
-    std::vector<std::complex<float>> in_data(10, std::complex<float>(1.0, 0.0));
-    std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {0.0, 0.0},
-                                                           {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {0.0, 0.0} };
-    
-    uint32_t filter_delay = falcon_dsp::calculate_filter_delay_from_sample_rates(coeffs.size(), 40, 50);
-    std::cout << "Computed filter delay of " << filter_delay << " samples" << std::endl;
-    
-    std::vector<std::complex<float>> out_data;
-    EXPECT_TRUE(resampler.apply(in_data, out_data));
-    EXPECT_TRUE(out_data.size() >= (expected_out_data.size() - filter_delay * ALLOWED_SHORT_OUT_SAMPLE_MULTIPLIER));
-    
-    for (uint32_t ii = 0; ii < expected_out_data.size() && ii < out_data.size(); ++ii)
-    {
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), 0.1) << " Error at index: " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), 0.1) << " Error at index: " << ii;
-    }
-}
-
-TEST(falcon_dsp_resample_cuda, cuda_resample_004)
+TEST(falcon_dsp_resample, cpp_resample_004)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_004_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_004.filter_coeffs.txt";
@@ -305,11 +207,11 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_004)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 5e5;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_resample_cuda, cuda_resample_005)
+TEST(falcon_dsp_resample, cpp_resample_005)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_005_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_005.filter_coeffs.txt";
@@ -319,11 +221,11 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_005)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 6e5;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_resample_cuda, cuda_resample_006)
+TEST(falcon_dsp_resample, cpp_resample_006)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_006_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_006.filter_coeffs.txt";
@@ -333,11 +235,11 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_006)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 2e6;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_resample_cuda, cuda_resample_007)
+TEST(falcon_dsp_resample, cpp_resample_007)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_007_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_007.filter_coeffs.txt";
@@ -347,11 +249,11 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_007)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 800e3;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_resample_cuda, cuda_resample_008)
+TEST(falcon_dsp_resample, cpp_resample_008)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_008_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_008.filter_coeffs.txt";
@@ -361,11 +263,11 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_008)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 450e3;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
 
-TEST(falcon_dsp_resample_cuda, cuda_resample_009)
+TEST(falcon_dsp_resample, cpp_resample_009)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_009_x.bin";
     std::string IN_FILT_COEFF_FILE_NAME = "vectors/test_009.filter_coeffs.txt";
@@ -375,6 +277,6 @@ TEST(falcon_dsp_resample_cuda, cuda_resample_009)
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const uint32_t OUTPUT_SAMPLE_RATE_IN_SPS = 44e3;
     
-    run_cuda_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
-                           INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
+    run_cpp_resample_test(IN_TEST_FILE_NAME, IN_FILT_COEFF_FILE_NAME, OUT_TEST_FILE_NAME,
+                          INPUT_SAMPLE_RATE_IN_SPS, OUTPUT_SAMPLE_RATE_IN_SPS);
 }
