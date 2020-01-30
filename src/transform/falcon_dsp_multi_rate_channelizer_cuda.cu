@@ -27,7 +27,7 @@
  *
  * @file     falcon_dsp_multi_rate_channelizer_cuda.cu
  * @author   OrthogonalHawk
- * @date     04-Jun-2019
+ * @date     28-Jan-2020
  *
  * @brief    Signal processing transformation class and functions to implement
  *            a multi-rate channelizer in CUDA.
