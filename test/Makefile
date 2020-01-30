@@ -62,6 +62,7 @@ CC_SOURCES = \
     tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_fir_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_iir_filter_cpp_unit_tests.cc \
+    tests/transform/falcon_dsp_multi_rate_channelizer_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_polar_discriminator_cpp_unit_tests.cc \
     tests/utilities/falcon_dsp_utils_unit_tests.cc \
     /usr/src/googletest/googletest/src/gtest-all.cc \
