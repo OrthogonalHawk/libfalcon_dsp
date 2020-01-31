@@ -133,15 +133,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
 
-struct polyphase_resampler_kernel_thread_params_s
+struct polyphase_resampler_output_params_s
 {
-    polyphase_resampler_kernel_thread_params_s(int64_t x_idx, uint32_t start_coeff_phase)
-      : thread_start_x_idx(x_idx),
-        thread_start_coeff_phase(start_coeff_phase)
+    polyphase_resampler_output_params_s(int64_t x_idx, uint32_t start_coeff_phase)
+      : start_x_idx(x_idx),
+        start_coeff_phase(start_coeff_phase)
     { }
 
-    int64_t thread_start_x_idx;
-    uint32_t thread_start_coeff_phase;
+    int64_t start_x_idx;
+    uint32_t start_coeff_phase;
 };
 
 /******************************************************************************
@@ -158,7 +158,7 @@ namespace falcon_dsp
      *  computing a single output per CUDA thread */
     __global__
     void __polyphase_resampler_single_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                          polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                          polyphase_resampler_output_params_s * output_params, uint32_t params_len,
                                           cuFloatComplex * in, uint32_t in_len,
                                           cuFloatComplex * out, uint32_t out_len,
                                           uint32_t coeffs_per_phase);
@@ -167,7 +167,7 @@ namespace falcon_dsp
      *  computing multiple outputs per CUDA thread */
     __global__
     void __polyphase_resampler_multi_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                         polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                         polyphase_resampler_output_params_s * output_params, uint32_t params_len,
                                          cuFloatComplex * in, uint32_t in_len,
                                          cuFloatComplex * out, uint32_t out_len,
                                          uint32_t coeffs_per_phase,
@@ -189,14 +189,14 @@ namespace falcon_dsp
     {
     public:
         
-        static bool compute_kernel_params(uint32_t up_rate, uint32_t down_rate,
+        static bool compute_output_params(uint32_t up_rate, uint32_t down_rate,
                                           int64_t start_x_idx, size_t in_size,
                                           uint32_t start_coeff_phase,
                                           uint32_t max_out_samples, uint32_t max_out_samples_per_thread,
                                           uint32_t& num_out_samples,
                                           uint32_t& new_coeff_phase,
                                           int64_t& new_x_idx,
-                                          std::vector<polyphase_resampler_kernel_thread_params_s>& params);
+                                          std::vector<polyphase_resampler_output_params_s>& params);
 
         falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate,
                                             std::vector<std::complex<float>>& filter_coeffs);
@@ -217,8 +217,8 @@ namespace falcon_dsp
         /* variables for CUDA memory management */
         cuFloatComplex *                                 m_cuda_input_samples;
         uint32_t                                         m_max_num_cuda_input_samples;
-        polyphase_resampler_kernel_thread_params_s *     m_kernel_thread_params;
-        uint32_t                                         m_num_kernel_thread_params;
+        polyphase_resampler_output_params_s *            m_output_params;
+        uint32_t                                         m_num_output_params;
         
         cuFloatComplex *                                 m_cuda_output_samples;
         uint32_t                                         m_max_num_cuda_output_samples;

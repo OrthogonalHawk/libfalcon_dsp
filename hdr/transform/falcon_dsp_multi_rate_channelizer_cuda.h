@@ -140,14 +140,14 @@ namespace falcon_dsp
             cuFloatComplex *                                        d_resample_coeffs;
             uint32_t                                                resample_coeffs_len;
             
-            polyphase_resampler_kernel_thread_params_s *            d_resample_kernel_thread_params;
-            uint32_t                                                resample_kernel_thread_params_len;
+            polyphase_resampler_output_params_s *                   d_resample_output_params;
+            uint32_t                                                resample_output_params_len;
             
             cuFloatComplex *                                        d_resampled_data;
             uint32_t                                                resampled_data_len;
             
             polyphase_resampler_params_s                            resampler_params;
-            std::vector<polyphase_resampler_kernel_thread_params_s> resample_kernel_thread_params;
+            std::vector<polyphase_resampler_output_params_s>        resample_output_params;
 
         private:
         

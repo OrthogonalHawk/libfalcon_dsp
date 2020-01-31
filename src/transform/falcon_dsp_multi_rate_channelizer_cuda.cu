@@ -61,7 +61,7 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
-const bool TIMING_LOGS_ENABLED = false;
+const bool TIMING_LOGS_ENABLED = true;
 
 const uint32_t MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_FREQ_SHIFT_KERNEL = 4;
 const uint32_t MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL = 1;
@@ -90,8 +90,8 @@ namespace falcon_dsp
         freq_shifted_data_len(0),
         d_resample_coeffs(nullptr),
         resample_coeffs_len(0),
-        d_resample_kernel_thread_params(nullptr),
-        resample_kernel_thread_params_len(0),
+        d_resample_output_params(nullptr),
+        resample_output_params_len(0),
         d_resampled_data(nullptr),
         resampled_data_len(0)
     {
@@ -146,7 +146,7 @@ namespace falcon_dsp
     
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::get_num_resampler_thread_blocks(void)
     {
-        return (resample_kernel_thread_params_len / MAX_NUM_CUDA_THREADS);
+        return (resample_output_params_len / MAX_NUM_CUDA_THREADS);
     }
     
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::initialize(uint32_t input_vector_len)
@@ -193,11 +193,11 @@ namespace falcon_dsp
             num_resampler_thread_blocks++;
         }
         
-        /* pre-compute resample thread parameters */
+        /* pre-compute resample output parameters */
         uint32_t num_outputs_from_thread_blocks = 0;
         uint32_t new_coeff_phase = resampler_params.coeff_phase;
         int64_t new_x_idx = resample_x_idx;
-        falcon_dsp::falcon_dsp_polyphase_resampler_cuda::compute_kernel_params(resampler_params.up_rate,
+        falcon_dsp::falcon_dsp_polyphase_resampler_cuda::compute_output_params(resampler_params.up_rate,
                                                                                resampler_params.down_rate,
                                                                                resampler_params.state.size(),
                                                                                input_vector_len,
@@ -207,7 +207,7 @@ namespace falcon_dsp
                                                                                num_outputs_from_thread_blocks,
                                                                                new_coeff_phase,
                                                                                new_x_idx,
-                                                                               resample_kernel_thread_params);
+                                                                               resample_output_params);
         
         /* update the channel tracking information preemptively, assuming that if the user
          *  calls the initialize method the parameters will actually be used */
@@ -216,26 +216,26 @@ namespace falcon_dsp
         resampler_params.xOffset = resample_x_idx - input_vector_len;
         
         /* allocate space for the thread parameters */
-        if (resample_kernel_thread_params_len != (MAX_NUM_CUDA_THREADS * num_resampler_thread_blocks))
+        if (resample_output_params_len != (MAX_NUM_CUDA_THREADS * num_resampler_thread_blocks))
         {
-            if (d_resample_kernel_thread_params)
+            if (d_resample_output_params)
             {
-                cudaErrChkAssert(cudaFree(d_resample_kernel_thread_params));
-                d_resample_kernel_thread_params = nullptr;
-                resample_kernel_thread_params_len = 0;
+                cudaErrChkAssert(cudaFree(d_resample_output_params));
+                d_resample_output_params = nullptr;
+                resample_output_params_len = 0;
             }
             
-            resample_kernel_thread_params_len = MAX_NUM_CUDA_THREADS * num_resampler_thread_blocks;
-            cudaErrChkAssert(cudaMallocManaged(&d_resample_kernel_thread_params,
-                                               resample_kernel_thread_params_len *
-                                                   sizeof(polyphase_resampler_kernel_thread_params_s)));
+            resample_output_params_len = MAX_NUM_CUDA_THREADS * num_resampler_thread_blocks;
+            cudaErrChkAssert(cudaMallocManaged(&d_resample_output_params,
+                                               resample_output_params_len *
+                                                   sizeof(polyphase_resampler_output_params_s)));
         }
         
         /* copy the thread parameters into CUDA memory; these are recomputed each time the kernel runs
          *  although it is hoped that the memory does not need to be reallocated each time... */
-        cudaErrChkAssert(cudaMemcpy(d_resample_kernel_thread_params,
-                                    resample_kernel_thread_params.data(),
-                                    resample_kernel_thread_params.size() * sizeof(polyphase_resampler_kernel_thread_params_s),
+        cudaErrChkAssert(cudaMemcpy(d_resample_output_params,
+                                    resample_output_params.data(),
+                                    resample_output_params.size() * sizeof(polyphase_resampler_output_params_s),
                                     cudaMemcpyHostToDevice));
         
         /* allocate space for the resampled outputs */
@@ -265,11 +265,11 @@ namespace falcon_dsp
             resample_coeffs_len = 0;
         }
 
-        if (d_resample_kernel_thread_params)
+        if (d_resample_output_params)
         {
-            cudaErrChk(cudaFree(d_resample_kernel_thread_params));
-            d_resample_kernel_thread_params = nullptr;
-            resample_kernel_thread_params_len = 0;
+            cudaErrChk(cudaFree(d_resample_output_params));
+            d_resample_output_params = nullptr;
+            resample_output_params_len = 0;
         }
 
         if (d_resampled_data)
@@ -468,13 +468,13 @@ namespace falcon_dsp
             resample_timer_name << "RESAMP KERNEL " << chan_idx;
             falcon_dsp::falcon_dsp_host_timer resample_timer(resample_timer_name.str(), TIMING_LOGS_ENABLED);
         
-            if (MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL == 1)
+            if (MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL == 1 && false)
             {
                 __polyphase_resampler_single_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                              m_channels[chan_idx]->d_resample_coeffs,
                              m_channels[chan_idx]->resample_coeffs_len,
-                             m_channels[chan_idx]->d_resample_kernel_thread_params,
-                             m_channels[chan_idx]->resample_kernel_thread_params_len,
+                             m_channels[chan_idx]->d_resample_output_params,
+                             m_channels[chan_idx]->resample_output_params_len,
                              m_channels[chan_idx]->d_freq_shifted_data,
                              m_channels[chan_idx]->freq_shifted_data_len,
                              m_channels[chan_idx]->d_resampled_data,
@@ -486,8 +486,8 @@ namespace falcon_dsp
                 __polyphase_resampler_multi_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                              m_channels[chan_idx]->d_resample_coeffs,
                              m_channels[chan_idx]->resample_coeffs_len,
-                             m_channels[chan_idx]->d_resample_kernel_thread_params,
-                             m_channels[chan_idx]->resample_kernel_thread_params_len,
+                             m_channels[chan_idx]->d_resample_output_params,
+                             m_channels[chan_idx]->resample_output_params_len,
                              m_channels[chan_idx]->d_freq_shifted_data,
                              m_channels[chan_idx]->freq_shifted_data_len,
                              m_channels[chan_idx]->d_resampled_data,

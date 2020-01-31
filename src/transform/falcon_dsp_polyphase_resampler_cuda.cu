@@ -102,7 +102,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                                 CONSTANTS
  *****************************************************************************/
 
-const bool TIMING_ENABLED = false;
+const bool TIMING_ENABLED = true;
 
 const uint32_t MAX_NUM_OUTPUTS_PER_CUDA_THREAD = 1;
 const uint32_t MAX_NUM_CUDA_THREADS = 1024;
@@ -153,7 +153,7 @@ namespace falcon_dsp
      *  computing a single output per CUDA thread */
     __global__
     void __polyphase_resampler_single_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                          polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                          polyphase_resampler_output_params_s * output_params, uint32_t params_len,
                                           cuFloatComplex * in, uint32_t in_len,
                                           cuFloatComplex * out, uint32_t out_len,
                                           uint32_t coeffs_per_phase)
@@ -188,10 +188,10 @@ namespace falcon_dsp
             __syncthreads();
         }
         
-        /* retrieve local thread variables */
-        polyphase_resampler_kernel_thread_params_s params = thread_params[thread_index];
-        int64_t thread_x_idx = params.thread_start_x_idx;
-        uint32_t thread_coeff_phase = params.thread_start_coeff_phase;
+        /* retrieve local output variables */
+        polyphase_resampler_output_params_s params = output_params[thread_index];
+        int64_t thread_x_idx = params.start_x_idx;
+        uint32_t thread_coeff_phase = params.start_coeff_phase;
         
         /* verify that this thread has at least one output to compute */
         if (thread_index >= out_len)
@@ -230,7 +230,7 @@ namespace falcon_dsp
      *  computing multiple outputs per CUDA thread */
     __global__
     void __polyphase_resampler_multi_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                         polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                         polyphase_resampler_output_params_s * output_params, uint32_t params_len,
                                          cuFloatComplex * in, uint32_t in_len,
                                          cuFloatComplex * out, uint32_t out_len,
                                          uint32_t coeffs_per_phase,
@@ -270,9 +270,9 @@ namespace falcon_dsp
         }
         
         /* retrieve local thread variables */
-        polyphase_resampler_kernel_thread_params_s params = thread_params[thread_index];
-        int64_t thread_x_idx = params.thread_start_x_idx;
-        uint32_t thread_coeff_phase = params.thread_start_coeff_phase;
+        polyphase_resampler_output_params_s params = output_params[thread_index];
+        int64_t thread_x_idx = params.start_x_idx;
+        uint32_t thread_coeff_phase = params.start_coeff_phase;
         
         /* verify that this thread has at least one output to compute */
         int64_t thread_start_output_sample_idx = thread_index * num_outputs_per_cuda_thread;
@@ -392,8 +392,8 @@ namespace falcon_dsp
       : falcon_dsp_polyphase_resampler(up_rate, down_rate, filter_coeffs),
         m_cuda_input_samples(nullptr),
         m_max_num_cuda_input_samples(0),
-        m_kernel_thread_params(nullptr),
-        m_num_kernel_thread_params(0),
+        m_output_params(nullptr),
+        m_num_output_params(0),
         m_cuda_output_samples(nullptr),
         m_max_num_cuda_output_samples(0),
         m_cuda_filter_coeffs(nullptr),
@@ -429,11 +429,11 @@ namespace falcon_dsp
             m_cuda_filter_coeffs = nullptr;
         }
 
-        if (m_kernel_thread_params)
+        if (m_output_params)
         {
-            cudaErrChk(cudaFree(m_kernel_thread_params));
-            m_kernel_thread_params = nullptr;
-            m_num_kernel_thread_params = 0;
+            cudaErrChk(cudaFree(m_output_params));
+            m_output_params = nullptr;
+            m_num_output_params = 0;
         }
 
         if (m_cuda_input_samples)
@@ -466,10 +466,10 @@ namespace falcon_dsp
         uint32_t num_outputs_from_thread_blocks = 0;
         uint32_t new_coeff_phase = m_params.coeff_phase;
         int64_t new_x_idx = x_idx;
-        std::vector<polyphase_resampler_kernel_thread_params_s> kernel_thread_params;
-        compute_kernel_params(m_params.up_rate, m_params.down_rate, m_params.state.size(), in.size(), m_params.coeff_phase,
+        std::vector<polyphase_resampler_output_params_s> output_params;
+        compute_output_params(m_params.up_rate, m_params.down_rate, m_params.state.size(), in.size(), m_params.coeff_phase,
                               needed_out_count(in.size()), m_num_outputs_per_cuda_thread,
-                              num_outputs_from_thread_blocks, new_coeff_phase, new_x_idx, kernel_thread_params);
+                              num_outputs_from_thread_blocks, new_coeff_phase, new_x_idx, output_params);
         
         /* allocate CUDA unified memory space for input and output data. it is left as a future
          *  optimization to break the input data into chunks to limit the amount of memory */
@@ -509,22 +509,22 @@ namespace falcon_dsp
             MAX_NUM_CUDA_THREADS, num_thread_blocks,
             num_outputs_from_thread_blocks, m_max_num_cuda_output_samples,
             m_num_outputs_per_cuda_thread,
-            kernel_thread_params.size());
+            output_params.size());
 
-        /* allocated CUDA memory for the thread parameters if necessary */
-        if (m_num_kernel_thread_params != (MAX_NUM_CUDA_THREADS * num_thread_blocks))
+        /* allocated CUDA memory for the output parameters if necessary */
+        if (m_num_output_params != (MAX_NUM_CUDA_THREADS * num_thread_blocks))
         {
-            if (m_kernel_thread_params)
+            if (m_output_params)
             {
-                cudaFree(m_kernel_thread_params);
-                m_kernel_thread_params = nullptr;
-                m_num_kernel_thread_params = 0;
+                cudaFree(m_output_params);
+                m_output_params = nullptr;
+                m_num_output_params = 0;
             }
             
-            m_num_kernel_thread_params = MAX_NUM_CUDA_THREADS * num_thread_blocks;
-            cudaErrChkAssert(cudaMallocManaged(&m_kernel_thread_params,
-                                               m_num_kernel_thread_params *
-                                                   sizeof(polyphase_resampler_kernel_thread_params_s)));
+            m_num_output_params = MAX_NUM_CUDA_THREADS * num_thread_blocks;
+            cudaErrChkAssert(cudaMallocManaged(&m_output_params,
+                                               m_num_output_params *
+                                                   sizeof(polyphase_resampler_output_params_s)));
         }
         
         /* copy the state vector into CUDA memory */
@@ -534,9 +534,9 @@ namespace falcon_dsp
                          cudaMemcpyHostToDevice));
         
         /* copy the thread parameters into CUDA memory */
-        cudaErrChkAssert(cudaMemcpy(m_kernel_thread_params,
-                                    kernel_thread_params.data(),
-                                    kernel_thread_params.size() * sizeof(polyphase_resampler_kernel_thread_params_s),
+        cudaErrChkAssert(cudaMemcpy(m_output_params,
+                                    output_params.data(),
+                                    output_params.size() * sizeof(polyphase_resampler_output_params_s),
                                     cudaMemcpyHostToDevice));
         
         /* copy the input samples into CUDA memory */
@@ -552,8 +552,8 @@ namespace falcon_dsp
             __polyphase_resampler_single_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                              m_cuda_filter_coeffs,
                              m_params.transposed_coeffs.size(),
-                             m_kernel_thread_params,
-                             m_num_kernel_thread_params,
+                             m_output_params,
+                             m_num_output_params,
                              m_cuda_input_samples,
                              m_max_num_cuda_input_samples,
                              m_cuda_output_samples,
@@ -565,8 +565,8 @@ namespace falcon_dsp
             __polyphase_resampler_multi_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                              m_cuda_filter_coeffs,
                              m_params.transposed_coeffs.size(),
-                             m_kernel_thread_params,
-                             m_num_kernel_thread_params,
+                             m_output_params,
+                             m_num_output_params,
                              m_cuda_input_samples,
                              m_max_num_cuda_input_samples,
                              m_cuda_output_samples,
@@ -614,7 +614,7 @@ namespace falcon_dsp
         return out.size();
     }
     
-    bool falcon_dsp_polyphase_resampler_cuda::compute_kernel_params(uint32_t up_rate, uint32_t down_rate,
+    bool falcon_dsp_polyphase_resampler_cuda::compute_output_params(uint32_t up_rate, uint32_t down_rate,
                                                                     int64_t start_x_idx, size_t in_size,
                                                                     uint32_t start_coeff_phase,
                                                                     uint32_t max_out_samples,
@@ -622,7 +622,7 @@ namespace falcon_dsp
                                                                     uint32_t& num_out_samples,
                                                                     uint32_t& new_coeff_phase,
                                                                     int64_t& new_x_idx,
-                                                                    std::vector<polyphase_resampler_kernel_thread_params_s>& params)
+                                                                    std::vector<polyphase_resampler_output_params_s>& params)
     {
         uint32_t num_samples_in_current_thread = 0;
         
@@ -639,7 +639,7 @@ namespace falcon_dsp
         }
         
         /* always start by pushing back the initial parameters */
-        params.push_back(polyphase_resampler_kernel_thread_params_s(new_x_idx, new_coeff_phase));
+        params.push_back(polyphase_resampler_output_params_s(new_x_idx, new_coeff_phase));
         
         /* compute kernel thread parameters */
         while (num_out_samples < max_out_samples && new_x_idx < in_size)
@@ -647,7 +647,7 @@ namespace falcon_dsp
             /* periodically save off the thread params */
             if (num_samples_in_current_thread >= max_out_samples_per_thread)
             {
-                params.push_back(polyphase_resampler_kernel_thread_params_s(new_x_idx, new_coeff_phase));
+                params.push_back(polyphase_resampler_output_params_s(new_x_idx, new_coeff_phase));
                 num_samples_in_current_thread = 0;
             }
             
