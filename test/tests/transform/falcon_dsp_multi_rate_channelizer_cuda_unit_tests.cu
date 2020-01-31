@@ -172,10 +172,10 @@ void run_cuda_multi_rate_channelizer_test(std::string input_file_name,
     {
         for (uint32_t ii = 0; ii < in_data.size() && ii < expected_out_data[out_idx].size(); ++ii)
         {
-            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), expected_out_data[out_idx][ii].real(),
+            ASSERT_NEAR(out_data[out_idx][ii].real(), expected_out_data[out_idx][ii].real(),
                         abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
             
-            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), expected_out_data[out_idx][ii].imag(),
+            ASSERT_NEAR(out_data[out_idx][ii].imag(), expected_out_data[out_idx][ii].imag(),
                         abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
         }
     }
