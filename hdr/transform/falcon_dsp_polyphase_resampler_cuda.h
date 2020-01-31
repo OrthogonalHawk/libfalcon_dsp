@@ -171,9 +171,7 @@ namespace falcon_dsp
                                          cuFloatComplex * in, uint32_t in_len,
                                          cuFloatComplex * out, uint32_t out_len,
                                          uint32_t coeffs_per_phase,
-                                         uint32_t num_outputs_per_cuda_thread,
-                                         uint32_t up_rate,
-                                         uint32_t down_rate);
+                                         uint32_t num_outputs_per_cuda_thread);
     
     
     /******************************************************************************
