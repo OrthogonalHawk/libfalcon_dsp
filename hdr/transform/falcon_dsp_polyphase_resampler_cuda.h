@@ -106,6 +106,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 03-Sep-2019  OrthogonalHawk  File created.
  * 24-Jan-2020  OrthogonalHawk  Fixing bugs with implementation and switched to
  *                               fully specified class from templated class.
+ * 31-Jan-2020  OrthogonalHawk  Added optimized resampler kernel for a single
+ *                               output per thread.
  *
  *****************************************************************************/
 
@@ -152,16 +154,26 @@ namespace falcon_dsp
      *                           FUNCTION DECLARATION
      *****************************************************************************/
     
-    /* CUDA kernel function that resamples the input array */
+    /* CUDA kernel function that resamples the input array. this version supports
+     *  computing a single output per CUDA thread */
     __global__
-    void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                    polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
-                                    cuFloatComplex * in, uint32_t in_len,
-                                    cuFloatComplex * out, uint32_t out_len,
-                                    uint32_t coeffs_per_phase,
-                                    uint32_t num_outputs_per_cuda_thread,
-                                    uint32_t up_rate,
-                                    uint32_t down_rate);
+    void __polyphase_resampler_single_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                          polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                          cuFloatComplex * in, uint32_t in_len,
+                                          cuFloatComplex * out, uint32_t out_len,
+                                          uint32_t coeffs_per_phase);
+    
+    /* CUDA kernel function that resamples the input array. this version supports
+     *  computing multiple outputs per CUDA thread */
+    __global__
+    void __polyphase_resampler_multi_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                         polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                         cuFloatComplex * in, uint32_t in_len,
+                                         cuFloatComplex * out, uint32_t out_len,
+                                         uint32_t coeffs_per_phase,
+                                         uint32_t num_outputs_per_cuda_thread,
+                                         uint32_t up_rate,
+                                         uint32_t down_rate);
     
     
     /******************************************************************************

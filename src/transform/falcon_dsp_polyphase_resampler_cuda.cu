@@ -80,6 +80,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 22-Apr-2019  OrthogonalHawk  File created.
  * 24-Jan-2020  OrthogonalHawk  Fixing bugs with implementation and switched to
  *                               fully specified class from templated class.
+ * 31-Jan-2020  OrthogonalHawk  Added optimized resampler kernel for a single
+ *                               output per thread.
  *
  *****************************************************************************/
 
@@ -146,17 +148,95 @@ namespace falcon_dsp
     /******************************************************************************
      *                         FUNCTION IMPLEMENTATION
      *****************************************************************************/
-    
-    /* CUDA kernel function that resamples the input array */
+
+    /* CUDA kernel function that resamples the input array. this version supports
+     *  computing a single output per CUDA thread */
     __global__
-    void __polyphase_resampler_cuda(cuFloatComplex * coeffs, uint32_t coeffs_len,
-                                    polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
-                                    cuFloatComplex * in, uint32_t in_len,
-                                    cuFloatComplex * out, uint32_t out_len,
-                                    uint32_t coeffs_per_phase,
-                                    uint32_t num_outputs_per_cuda_thread,
-                                    uint32_t up_rate,
-                                    uint32_t down_rate)
+    void __polyphase_resampler_single_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                          polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                          cuFloatComplex * in, uint32_t in_len,
+                                          cuFloatComplex * out, uint32_t out_len,
+                                          uint32_t coeffs_per_phase)
+    {
+        __shared__ cuFloatComplex s_coeffs[MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY];
+        output_sample_s out_sample;
+        
+        /* compute the thread index */
+        uint32_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+        
+        /* sanity check inputs */
+        if (in == nullptr ||
+            out == nullptr ||
+            coeffs == nullptr ||
+            thread_index > params_len)
+        {
+            return;
+        }
+        
+        /* optionally load coefficients into shared memory */
+        if (coeffs_len < MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY)
+        {
+            uint32_t num_coefficients_per_thread = (coeffs_len / blockDim.x) + 1;
+            for (uint32_t coeff_idx = threadIdx.x * num_coefficients_per_thread;
+                 coeff_idx < ((threadIdx.x * num_coefficients_per_thread) + num_coefficients_per_thread) &&
+                     coeff_idx < coeffs_len;
+                 ++coeff_idx)
+            {
+                s_coeffs[coeff_idx] = coeffs[coeff_idx];
+            }
+            
+            __syncthreads();
+        }
+        
+        /* retrieve local thread variables */
+        polyphase_resampler_kernel_thread_params_s params = thread_params[thread_index];
+        int64_t thread_x_idx = params.thread_start_x_idx;
+        uint32_t thread_coeff_phase = params.thread_start_coeff_phase;
+        
+        /* verify that this thread has at least one output to compute */
+        if (thread_index >= out_len)
+        {
+            return;
+        }
+        
+        /* capture the output sample information */
+        out_sample.active = true;
+        if (coeffs_len < MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY)
+        {
+            out_sample.coeff_ptr = s_coeffs + thread_coeff_phase * coeffs_per_phase;
+        }
+        else
+        {
+            out_sample.coeff_ptr = coeffs + thread_coeff_phase * coeffs_per_phase;
+        }
+        out_sample.data_start_idx = thread_x_idx - coeffs_per_phase + 1;
+        out_sample.data_stop_idx = thread_x_idx;
+        
+        /* read samples from the input buffer and process */
+        for (int64_t x_idx = out_sample.data_start_idx;
+             x_idx < (out_sample.data_stop_idx + 1) &&
+                 x_idx < in_len;
+             ++x_idx)
+        {   
+            out_sample.acc = cuCaddf(out_sample.acc,
+                                     cuCmulf(in[x_idx], *(out_sample.coeff_ptr++)));
+        }
+        
+        /* set the global output */
+        out[thread_index] = out_sample.acc;
+    }
+
+    /* CUDA kernel function that resamples the input array. this version supports
+     *  computing multiple outputs per CUDA thread */
+    __global__
+    void __polyphase_resampler_multi_out(cuFloatComplex * coeffs, uint32_t coeffs_len,
+                                         polyphase_resampler_kernel_thread_params_s * thread_params, uint32_t params_len,
+                                         cuFloatComplex * in, uint32_t in_len,
+                                         cuFloatComplex * out, uint32_t out_len,
+                                         uint32_t coeffs_per_phase,
+                                         uint32_t num_outputs_per_cuda_thread,
+                                         uint32_t up_rate,
+                                         uint32_t down_rate)
     {
         __shared__ cuFloatComplex s_coeffs[MAX_NUM_COEFFICIENTS_IN_SHARED_MEMORY];
         output_sample_s out_samples[MAX_NUM_OUTPUTS_PER_CUDA_THREAD];
@@ -467,26 +547,54 @@ namespace falcon_dsp
         
         falcon_dsp::falcon_dsp_host_timer timer("KERNEL", TIMING_ENABLED);
         
-        __polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
-                         m_cuda_filter_coeffs,
-                         m_params.transposed_coeffs.size(),
-                         m_kernel_thread_params,
-                         m_num_kernel_thread_params,
-                         m_cuda_input_samples,
-                         m_max_num_cuda_input_samples,
-                         m_cuda_output_samples,
-                         m_max_num_cuda_output_samples,
-                         m_params.coeffs_per_phase,
-                         m_num_outputs_per_cuda_thread,
-                         m_params.up_rate,
-                         m_params.down_rate);
+        if (m_num_outputs_per_cuda_thread == 1)
+        {
+            __polyphase_resampler_single_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                             m_cuda_filter_coeffs,
+                             m_params.transposed_coeffs.size(),
+                             m_kernel_thread_params,
+                             m_num_kernel_thread_params,
+                             m_cuda_input_samples,
+                             m_max_num_cuda_input_samples,
+                             m_cuda_output_samples,
+                             m_max_num_cuda_output_samples,
+                             m_params.coeffs_per_phase);
+        }
+        else
+        {
+            __polyphase_resampler_multi_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                             m_cuda_filter_coeffs,
+                             m_params.transposed_coeffs.size(),
+                             m_kernel_thread_params,
+                             m_num_kernel_thread_params,
+                             m_cuda_input_samples,
+                             m_max_num_cuda_input_samples,
+                             m_cuda_output_samples,
+                             m_max_num_cuda_output_samples,
+                             m_params.coeffs_per_phase,
+                             m_num_outputs_per_cuda_thread,
+                             m_params.up_rate,
+                             m_params.down_rate);
+        }
 
         cudaErrChkAssert(cudaPeekAtLastError());
 
         /* wait for GPU to finish before accessing on host */
         cudaErrChkAssert(cudaDeviceSynchronize());
         
-        timer.log_duration("Filtering");
+        timer.log_duration("Filtering"); timer.stop();
+        
+        /* estimate the memory bandwidth achieved */
+        uint32_t num_samples_read_from_global_memory = (in.size() + m_params.state.size()) * (m_params.coeffs_per_phase + 1) +
+            m_params.transposed_coeffs.size();
+        uint32_t num_samples_written_to_global_memory = num_outputs_from_thread_blocks;
+        
+        uint64_t total_memory_transferred_in_bytes = (num_samples_read_from_global_memory + num_samples_written_to_global_memory) * sizeof(std::complex<float>);
+        double memory_bandwidth_in_bytes = total_memory_transferred_in_bytes / (timer.get_duration_in_ms() / 1000.0);
+        double memory_bandwidth_in_GBytes = memory_bandwidth_in_bytes / 1024.0 / 1024.0 / 1024.0;
+        
+        std::cout << "Estimated " << total_memory_transferred_in_bytes << " bytes transferred over " << timer.get_duration_in_ms() << " ms" << std::endl;
+        std::cout << "Estimated memory bandwidth (GB per second): " << memory_bandwidth_in_GBytes << std::endl;
         
         /* copy output samples out of CUDA memory */
         cudaErrChkAssert(cudaMemcpy(out.data(),

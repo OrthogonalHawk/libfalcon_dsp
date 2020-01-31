@@ -41,6 +41,8 @@
  * @section  HISTORY
  *
  * 28-Jan-2020  OrthogonalHawk  File created.
+ * 31-Jan-2020  OrthogonalHawk  Optionally use optimized resampler kernel for
+ *                               a single output per thread.
  *
  *****************************************************************************/
 
@@ -466,7 +468,22 @@ namespace falcon_dsp
             resample_timer_name << "RESAMP KERNEL " << chan_idx;
             falcon_dsp::falcon_dsp_host_timer resample_timer(resample_timer_name.str(), TIMING_LOGS_ENABLED);
         
-            __polyphase_resampler_cuda<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+            if (MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL == 1)
+            {
+                __polyphase_resampler_single_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                             m_channels[chan_idx]->d_resample_coeffs,
+                             m_channels[chan_idx]->resample_coeffs_len,
+                             m_channels[chan_idx]->d_resample_kernel_thread_params,
+                             m_channels[chan_idx]->resample_kernel_thread_params_len,
+                             m_channels[chan_idx]->d_freq_shifted_data,
+                             m_channels[chan_idx]->freq_shifted_data_len,
+                             m_channels[chan_idx]->d_resampled_data,
+                             m_channels[chan_idx]->resampled_data_len,
+                             m_channels[chan_idx]->resampler_params.coeffs_per_phase);
+            }
+            else
+            {
+                __polyphase_resampler_multi_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
                              m_channels[chan_idx]->d_resample_coeffs,
                              m_channels[chan_idx]->resample_coeffs_len,
                              m_channels[chan_idx]->d_resample_kernel_thread_params,
@@ -479,6 +496,7 @@ namespace falcon_dsp
                              MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL,
                              m_channels[chan_idx]->resampler_params.up_rate,
                              m_channels[chan_idx]->resampler_params.down_rate);
+            }
 
             cudaErrChkAssert(cudaPeekAtLastError());
 
