@@ -192,7 +192,7 @@ namespace falcon_dsp
         static bool compute_output_params(uint32_t up_rate, uint32_t down_rate,
                                           int64_t start_x_idx, size_t in_size,
                                           uint32_t start_coeff_phase,
-                                          uint32_t max_out_samples, uint32_t max_out_samples_per_thread,
+                                          uint32_t max_out_samples,
                                           uint32_t& num_out_samples,
                                           uint32_t& new_coeff_phase,
                                           int64_t& new_x_idx,

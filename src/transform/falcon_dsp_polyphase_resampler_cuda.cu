@@ -468,7 +468,7 @@ namespace falcon_dsp
         int64_t new_x_idx = x_idx;
         std::vector<polyphase_resampler_output_params_s> output_params;
         compute_output_params(m_params.up_rate, m_params.down_rate, m_params.state.size(), in.size(), m_params.coeff_phase,
-                              needed_out_count(in.size()), m_num_outputs_per_cuda_thread,
+                              needed_out_count(in.size()),
                               num_outputs_from_thread_blocks, new_coeff_phase, new_x_idx, output_params);
         
         /* allocate CUDA unified memory space for input and output data. it is left as a future
@@ -533,7 +533,7 @@ namespace falcon_dsp
                          m_params.state.size() * sizeof(std::complex<float>),
                          cudaMemcpyHostToDevice));
         
-        /* copy the thread parameters into CUDA memory */
+        /* copy the output parameters into CUDA memory */
         cudaErrChkAssert(cudaMemcpy(m_output_params,
                                     output_params.data(),
                                     output_params.size() * sizeof(polyphase_resampler_output_params_s),
@@ -618,46 +618,32 @@ namespace falcon_dsp
                                                                     int64_t start_x_idx, size_t in_size,
                                                                     uint32_t start_coeff_phase,
                                                                     uint32_t max_out_samples,
-                                                                    uint32_t max_out_samples_per_thread,
                                                                     uint32_t& num_out_samples,
                                                                     uint32_t& new_coeff_phase,
                                                                     int64_t& new_x_idx,
                                                                     std::vector<polyphase_resampler_output_params_s>& params)
-    {
-        uint32_t num_samples_in_current_thread = 0;
-        
+    {        
         /* initialize the output variables */
         num_out_samples = 0;
         new_coeff_phase = start_coeff_phase;
         new_x_idx = start_x_idx;
         params.clear();
         
-        /* sanity check the inputs */
-        if (max_out_samples_per_thread == 0)
-        {
-            return false;
-        }
-        
         /* always start by pushing back the initial parameters */
         params.push_back(polyphase_resampler_output_params_s(new_x_idx, new_coeff_phase));
         
-        /* compute kernel thread parameters */
+        /* compute output parameters */
         while (num_out_samples < max_out_samples && new_x_idx < in_size)
-        {
-            /* periodically save off the thread params */
-            if (num_samples_in_current_thread >= max_out_samples_per_thread)
-            {
-                params.push_back(polyphase_resampler_output_params_s(new_x_idx, new_coeff_phase));
-                num_samples_in_current_thread = 0;
-            }
-            
+        {           
             /* compute the next 'cycle' updates */
             new_coeff_phase += down_rate;
             int64_t advance_amount = new_coeff_phase / up_rate;
             new_x_idx += advance_amount;
             new_coeff_phase %= up_rate;
             num_out_samples++;
-            num_samples_in_current_thread++;
+            
+            /* save off the next set of parameters */
+            params.push_back(polyphase_resampler_output_params_s(new_x_idx, new_coeff_phase));
         }
 
         return true;

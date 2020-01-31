@@ -203,7 +203,6 @@ namespace falcon_dsp
                                                                                input_vector_len,
                                                                                resampler_params.coeff_phase,
                                                                                expected_num_outputs,
-                                                                               MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL,
                                                                                num_outputs_from_thread_blocks,
                                                                                new_coeff_phase,
                                                                                new_x_idx,
