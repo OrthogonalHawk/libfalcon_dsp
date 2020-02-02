@@ -59,7 +59,8 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
-const float MIN_ALLOWED_DIFF = 2048.0 * 0.02;
+/* set maximum allowed difference; tuned based on Python vs. C++ results */
+const float MIN_ALLOWED_DIFF = 2048.0 * 0.025;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -382,7 +383,7 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_013)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { 57982, 239457, 426534, 499857, 463877 };
+    std::vector<int32_t> freq_shifts = { 63800, 55000, 264200, 188900, 14500 };
     
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
@@ -397,7 +398,7 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_014)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { -141451, 307008, 54623, 445497, 71758, 141718, 114510, 162143, 78135, 118135 };
+    std::vector<int32_t> freq_shifts = { 91900, 445800, 440700, 415400, 344700, 312900, 245400, 213000, 162200, -109600 };
     
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
@@ -413,7 +414,7 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_by_segment_014)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { -141451, 307008, 54623, 445497, 71758, 141718, 114510, 162143, 78135, 118135 };
+    std::vector<int32_t> freq_shifts = { 91900, 445800, 440700, 415400, 344700, 312900, 245400, 213000, 162200, -109600 };
     
     run_cuda_multi_chan_freq_shift_by_segment_test(IN_TEST_FILE_NAME,
                                                    OUT_TEST_FILE_BASE_NAME,
