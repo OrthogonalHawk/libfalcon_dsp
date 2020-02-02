@@ -59,6 +59,8 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
+const float MIN_ALLOWED_DIFF = 2048.0 * 0.02;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -115,9 +117,12 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
     EXPECT_EQ(in_data.size(), out_data.size());
     
     for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
-    {
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
+    {            
+        ASSERT_NEAR(expected_out_data[ii].real(),
+                    out_data[ii].real(), MIN_ALLOWED_DIFF) << " failure at index " << ii;
+                    
+        ASSERT_NEAR(expected_out_data[ii].imag(),
+                    out_data[ii].imag(), MIN_ALLOWED_DIFF) << " failure at index " << ii;
     }
     
     timer.log_duration("Data Validated");
@@ -175,18 +180,20 @@ void run_cuda_multi_chan_freq_shift_test(std::string input_file_name,
 
     for (auto out_iter : out_data)
     {
-        EXPECT_EQ(in_data.size(), out_iter.size());
+        ASSERT_EQ(in_data.size(), out_iter.size());
     }
     
     for (uint32_t out_idx = 0; out_idx < expected_out_data.size() && out_idx < out_data.size(); ++out_idx)
     {
-        for (uint32_t ii = 0; ii < in_data.size() && ii < expected_out_data[out_idx].size(); ++ii)
-        {
-            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), expected_out_data[out_idx][ii].real(),
-                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+        for (uint32_t ii = 0;
+             ii < in_data.size() && ii < expected_out_data[out_idx].size();
+             ++ii)
+        {       
+            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), out_data[out_idx][ii].real(),
+                        MIN_ALLOWED_DIFF) << " chan[" << out_idx << "] failure at index " << ii;
             
-            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), expected_out_data[out_idx][ii].imag(),
-                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), out_data[out_idx][ii].imag(),
+                        MIN_ALLOWED_DIFF) << " chan[" << out_idx << "] failure at index " << ii;
         }
     }
     
@@ -268,18 +275,20 @@ void run_cuda_multi_chan_freq_shift_by_segment_test(std::string input_file_name,
 
     for (auto out_iter : out_data)
     {
-        EXPECT_EQ(in_data.size(), out_iter.size());
+        ASSERT_EQ(in_data.size(), out_iter.size());
     }
     
     for (uint32_t out_idx = 0; out_idx < expected_out_data.size() && out_idx < out_data.size(); ++out_idx)
     {
-        for (uint32_t ii = 0; ii < in_data.size() && ii < expected_out_data[out_idx].size(); ++ii)
-        {
-            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), expected_out_data[out_idx][ii].real(),
-                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+        for (uint32_t ii = 0;
+             ii < in_data.size() && ii < expected_out_data[out_idx].size();
+             ++ii)
+        {        
+            ASSERT_NEAR(expected_out_data[out_idx][ii].real(), out_data[out_idx][ii].real(),
+                        MIN_ALLOWED_DIFF) << " chan[" << out_idx << "] failure at index " << ii;
             
-            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), expected_out_data[out_idx][ii].imag(),
-                        abs(expected_out_data[out_idx][ii]) * 0.01) << " chan[" << out_idx << "] failure at index " << ii;
+            ASSERT_NEAR(expected_out_data[out_idx][ii].imag(), out_data[out_idx][ii].imag(),
+                        MIN_ALLOWED_DIFF) << " chan[" << out_idx << "] failure at index " << ii;
         }
     }
     
@@ -325,6 +334,32 @@ TEST(falcon_dsp_freq_shift, cuda_freq_shift_003)
                              INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
 
+TEST(falcon_dsp_freq_shift, cuda_freq_shift_012_0)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_012_y_shift_23000_hz.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const int32_t  FREQ_SHIFT_IN_HZ = 23000;
+    
+    run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+}
+
+TEST(falcon_dsp_freq_shift, cuda_freq_shift_012_1)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_012_y_shift_-370400_hz.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const int32_t  FREQ_SHIFT_IN_HZ = -370400;
+    
+    run_cuda_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+}
+
 TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_012)
 {
     std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
@@ -332,8 +367,8 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_012)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-    std::vector<int32_t> freq_shifts = { -281375, 79297 };
-    
+//    std::vector<int32_t> freq_shifts = { 23000, -370400 };
+    std::vector<int32_t> freq_shifts = { -370400, -370400 };  
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
                                         INPUT_SAMPLE_RATE_IN_SPS,

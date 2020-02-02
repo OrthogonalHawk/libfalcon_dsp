@@ -98,7 +98,7 @@ namespace falcon_dsp
     {
     public:
 
-        static std::pair<uint32_t, float> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
+        static std::pair<uint32_t, double> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
 
         falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
         virtual ~falcon_dsp_freq_shift(void) = default;
@@ -115,7 +115,7 @@ namespace falcon_dsp
         std::mutex m_mutex;
         double     m_samples_handled;
         uint32_t   m_calculated_rollover_sample_idx;
-        float      m_angular_freq;
+        double     m_angular_freq;
     };
 }
 

@@ -61,6 +61,8 @@
  *                                 CONSTANTS
  *****************************************************************************/
 
+const float MIN_ALLOWED_DIFF = 2048.0 * 0.02;
+
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
@@ -105,21 +107,9 @@ void run_cpp_freq_shift_test(std::string input_file_name, std::string expected_o
     EXPECT_EQ(in_data.size(), out_data.size());
     
     for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
-    {   
-        float max_real_diff = abs(expected_out_data[ii].real()) * 0.01;
-        if (max_real_diff < 10)
-        {
-            max_real_diff = 10;
-        }
-        
-        float max_imag_diff = abs(expected_out_data[ii].imag()) * 0.01;
-        if (max_imag_diff < 10)
-        {
-            max_imag_diff = 10;
-        }
-        
-        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
-        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), abs(expected_out_data[ii]) * 0.01) << " failure at index " << ii;
+    {        
+        ASSERT_NEAR(expected_out_data[ii].real(), out_data[ii].real(), MIN_ALLOWED_DIFF) << " failure at index " << ii;
+        ASSERT_NEAR(expected_out_data[ii].imag(), out_data[ii].imag(), MIN_ALLOWED_DIFF) << " failure at index " << ii;
     }
     
     timer.log_duration("Data Validated");
@@ -159,6 +149,32 @@ TEST(falcon_dsp_freq_shift, cpp_freq_shift_003)
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
     const int32_t  FREQ_SHIFT_IN_HZ = -5000;
+    
+    run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                            INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+}
+
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_012_0)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_012_y_shift_23000_hz.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const int32_t  FREQ_SHIFT_IN_HZ = 23000;
+    
+    run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
+                            INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+}
+
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_012_1)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_012_x.bin";
+    std::string OUT_TEST_FILE_NAME = "vectors/test_012_y_shift_-370400_hz.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const int32_t  FREQ_SHIFT_IN_HZ = -370400;
     
     run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);

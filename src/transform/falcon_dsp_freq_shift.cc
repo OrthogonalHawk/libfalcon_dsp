@@ -120,7 +120,7 @@ namespace falcon_dsp
         
         for (auto it = in.begin(); it != in.end(); ++it)
         {
-            float angle = m_angular_freq * m_samples_handled;
+            double angle = m_angular_freq * m_samples_handled;
             out.push_back(std::complex<float>((*it).real(), (*it).imag()) *
                           std::complex<float>(cos(angle),
                                               sin(angle)));
@@ -160,7 +160,7 @@ namespace falcon_dsp
         return out.size() > 0;
     }
     
-    std::pair<uint32_t, float> falcon_dsp_freq_shift::get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
+    std::pair<uint32_t, double> falcon_dsp_freq_shift::get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
     {
         /* Frequency shift by multiplying by a complex sinusoid: e^(jwt) = cos(wt) + jsin(wt)
          *
@@ -184,22 +184,22 @@ namespace falcon_dsp
          */
         double rollover_idx = static_cast<double>(input_sample_rate_in_sps) / static_cast<double>(abs(freq_shift_in_hz));
 
-        /* 1e7 was chosen after empirical testing on a Jetson Nano as it did
+        /* 1e4 was chosen after empirical testing on a Jetson Nano as it did
          *  not seem to trigger the high computational cost case and kept the
          *  resulting angle values within a range where the C++/CUDA and
          *  Python/numpy computations agree with one another. */
-        while (rollover_idx < 1e5)
+        while (rollover_idx < 1e4)
         {
             rollover_idx *= 10;
         }
         
         /* convert the double to an unsigned integer to get the actual
          *  rollover index value */
-        uint32_t calculated_rollover_sample_idx = static_cast<uint32_t>(rollover_idx);
+        uint32_t calculated_rollover_sample_idx = static_cast<uint32_t>(round(rollover_idx));
           
         /* compute the angular frequency since it won't change */
-        float angular_freq = (float(freq_shift_in_hz) / float(input_sample_rate_in_sps)) * 2.0 * M_PI;
+        double angular_freq = (double(freq_shift_in_hz) / double(input_sample_rate_in_sps)) * 2.0 * M_PI;
         
-        return std::pair<uint32_t, float>(calculated_rollover_sample_idx, angular_freq);
+        return std::pair<uint32_t, double>(calculated_rollover_sample_idx, angular_freq);
     }
 }
