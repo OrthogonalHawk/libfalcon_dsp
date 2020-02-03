@@ -141,15 +141,16 @@ namespace falcon_dsp
         std::lock_guard<std::mutex> lock(std::mutex);
         
         out.clear();
-        
+
+        double angle;
+        std::complex<float> shift_angle;
         for (auto it = in.begin(); it != in.end(); ++it)
         {
-            float angle = m_angular_freq * m_samples_handled;
-            out.push_back(std::complex<float>((*it).real(), (*it).imag()) *
-                          std::complex<float>(cos(angle),
-                                              sin(angle)));
+            angle = m_angular_freq * m_samples_handled;
+            shift_angle = std::complex<float>(cos(angle), sin(angle));
+            out.push_back(std::complex<float>((*it).real(), (*it).imag()) * shift_angle);
             
-            m_samples_handled++;            
+            m_samples_handled++;
             
             if (m_samples_handled >= m_calculated_rollover_sample_idx)
             {
@@ -188,7 +189,7 @@ namespace falcon_dsp
          *  not seem to trigger the high computational cost case and kept the
          *  resulting angle values within a range where the C++/CUDA and
          *  Python/numpy computations agree with one another. */
-        while (rollover_idx < 1e4)
+        while (rollover_idx < 1e5)
         {
             rollover_idx *= 10;
         }

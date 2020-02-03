@@ -213,7 +213,7 @@ namespace falcon_dsp
         resampler_params.coeff_phase = new_coeff_phase;
         resample_x_idx += new_x_idx;
         resampler_params.xOffset = resample_x_idx - input_vector_len;
-        
+
         /* allocate space for the output parameters */
         if (resample_output_params_len != (MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * num_resampler_thread_blocks))
         {
@@ -230,7 +230,7 @@ namespace falcon_dsp
                                                    sizeof(polyphase_resampler_output_params_s)));
         }
         
-        /* copy the thread parameters into CUDA memory; these are recomputed each time the kernel runs
+        /* copy the output parameters into CUDA memory; these are recomputed each time the kernel runs
          *  although it is hoped that the memory does not need to be reallocated each time... */
         cudaErrChkAssert(cudaMemcpy(d_resample_output_params,
                                     resample_output_params.data(),
@@ -324,10 +324,10 @@ namespace falcon_dsp
             d_freq_shift_channels = nullptr;
         }
     }
-    
+
     bool falcon_dsp_multi_rate_channelizer_cuda::initialize(uint32_t input_sample_rate,
                                                             std::vector<multi_rate_channelizer_channel_s> channels)
-    {        
+    {
         std::lock_guard<std::mutex> lock(std::mutex);
 
         /* sanity check the inputs and verify that the class has not already been initialized */
@@ -378,18 +378,10 @@ namespace falcon_dsp
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         
-        /* clear the output data structures and resize so that they can hold the shifted
-         *  data. note that by using resize() the vector size is now equal to the final
-         *  output size without explicitly adding data to the vector, which means that
-         *  we can add data directly into the vector data buffer without worrying about
-         *  the vector size getting mismatched with the buffer contents (provided that
-         *  the promised number of samples are actually copied in...) */
+        /* clear the output data structures and resize so that they can hold
+         *  the shifted and resampled data. */
         out.clear();
         out.resize(m_channels.size());
-        for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
-        {
-            out[chan_idx].resize(m_channels[chan_idx]->get_num_outputs_for_input(in.size()));
-        }
         
         /* allocate CUDA memory for the input samples */
         if (m_max_num_input_samples != in.size())
@@ -409,7 +401,14 @@ namespace falcon_dsp
         /* allocate CUDA memory for the intermediate and output samples */
         for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
         {
-            m_channels[chan_idx]->initialize(in.size());
+            /* resize the outputs based on the actual number of outputs expected
+             *  from the resampling kernel. note that by using resize() the vector
+             *  size is now equal to the final output size without explicitly
+             *  adding data to the vector, which means that we can add data
+             *  directly into the vector data buffer without worrying about the 
+             *  vector size getting mismatched with the buffer contents (provided
+             *  that the promised number of samples are actually copied in...) */
+            out[chan_idx].resize(m_channels[chan_idx]->initialize(in.size()));
         }
 
         /* copy the input data to the GPU */
