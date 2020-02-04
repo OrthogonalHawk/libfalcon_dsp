@@ -119,8 +119,8 @@ namespace falcon_dsp
             
             /* copy the coefficients to the GPU */
             cudaErrChkAssert(cudaMemcpy(static_cast<void *>(d_resample_coeffs),
-                                        static_cast<void *>(resample_filter_coeffs.data()),
-                                        resample_filter_coeffs.size() * sizeof(std::complex<float>),
+                                        static_cast<void *>(resampler_params.transposed_coeffs.data()),
+                                        resampler_params.transposed_coeffs.size() * sizeof(std::complex<float>),
                                         cudaMemcpyHostToDevice));
         }
     }
