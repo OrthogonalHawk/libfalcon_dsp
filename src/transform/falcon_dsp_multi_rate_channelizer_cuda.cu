@@ -93,7 +93,8 @@ namespace falcon_dsp
         d_resample_output_params(nullptr),
         resample_output_params_len(0),
         d_resampled_data(nullptr),
-        resampled_data_len(0)
+        resampled_data_len(0),
+        m_num_resampler_thread_blocks(0)
     {
         output_sample_rate_in_sps = other.output_sample_rate_in_sps;
         freq_shift_in_hz = other.freq_shift_in_hz;
@@ -113,7 +114,7 @@ namespace falcon_dsp
                 resample_coeffs_len = 0;
             }
 
-            resample_coeffs_len = resample_filter_coeffs.size();
+            resample_coeffs_len = resampler_params.transposed_coeffs.size();
             cudaErrChkAssert(cudaMallocManaged(&d_resample_coeffs,
                                                resample_coeffs_len * sizeof(std::complex<float>)));
             
@@ -146,7 +147,7 @@ namespace falcon_dsp
     
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::get_num_resampler_thread_blocks(void)
     {
-        return (resample_output_params_len / MAX_NUM_CUDA_THREADS);
+        return m_num_resampler_thread_blocks;
     }
     
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::initialize(uint32_t input_vector_len)
@@ -187,10 +188,10 @@ namespace falcon_dsp
         int64_t resample_x_idx = resampler_params.xOffset;
         uint32_t num_outputs_per_resampler_thread_block =
                 MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL;
-        uint32_t num_resampler_thread_blocks = expected_num_outputs / num_outputs_per_resampler_thread_block;
+        m_num_resampler_thread_blocks = expected_num_outputs / num_outputs_per_resampler_thread_block;
         if (expected_num_outputs % num_outputs_per_resampler_thread_block != 0)
         {
-            num_resampler_thread_blocks++;
+            m_num_resampler_thread_blocks++;
         }
         
         /* pre-compute resample output parameters */
@@ -215,7 +216,7 @@ namespace falcon_dsp
         resampler_params.xOffset = resample_x_idx - input_vector_len;
 
         /* allocate space for the output parameters */
-        if (resample_output_params_len != (MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * num_resampler_thread_blocks))
+        if (resample_output_params_len != (MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * m_num_resampler_thread_blocks))
         {
             if (d_resample_output_params)
             {
@@ -224,7 +225,7 @@ namespace falcon_dsp
                 resample_output_params_len = 0;
             }
             
-            resample_output_params_len = MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * num_resampler_thread_blocks;
+            resample_output_params_len = MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * m_num_resampler_thread_blocks;
             cudaErrChkAssert(cudaMallocManaged(&d_resample_output_params,
                                                resample_output_params_len *
                                                    sizeof(polyphase_resampler_output_params_s)));
@@ -468,7 +469,8 @@ namespace falcon_dsp
         
             if (MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL == 1)
             {
-                __polyphase_resampler_single_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                __polyphase_resampler_single_out<<<m_channels[chan_idx]->get_num_resampler_thread_blocks(),
+                                                   MAX_NUM_CUDA_THREADS>>>(
                              m_channels[chan_idx]->d_resample_coeffs,
                              m_channels[chan_idx]->resample_coeffs_len,
                              m_channels[chan_idx]->d_resample_output_params,
@@ -481,7 +483,8 @@ namespace falcon_dsp
             }
             else
             {
-                __polyphase_resampler_multi_out<<<num_thread_blocks, MAX_NUM_CUDA_THREADS>>>(
+                __polyphase_resampler_multi_out<<<m_channels[chan_idx]->get_num_resampler_thread_blocks(),
+                                                  MAX_NUM_CUDA_THREADS>>>(
                              m_channels[chan_idx]->d_resample_coeffs,
                              m_channels[chan_idx]->resample_coeffs_len,
                              m_channels[chan_idx]->d_resample_output_params,

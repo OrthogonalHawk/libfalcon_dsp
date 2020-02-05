@@ -151,7 +151,7 @@ namespace falcon_dsp
 
         private:
         
-            
+            uint32_t                                                m_num_resampler_thread_blocks;
         };
 
         std::mutex                                            m_mutex;
