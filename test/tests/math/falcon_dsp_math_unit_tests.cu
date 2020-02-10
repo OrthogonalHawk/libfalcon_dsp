@@ -25,7 +25,7 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_math_unit_tests.cc
+ * @file     falcon_dsp_math_unit_tests.cu
  * @author   OrthogonalHawk
  * @date     19-Apr-2019
  *
@@ -74,7 +74,7 @@
  *                           UNIT TEST IMPLEMENTATION
  *****************************************************************************/
 
-TEST(falcon_dsp_math_add, cpp_add_func)
+TEST(falcon_dsp_math_add, cuda_add_func)
 {
     const uint32_t NUM_ELEMENTS = 1e6;
     
@@ -92,7 +92,7 @@ TEST(falcon_dsp_math_add, cpp_add_func)
         vec_b.push_back(2);
     }
     
-    falcon_dsp::add_vector<uint32_t>(vec_a, vec_b, vec_sum);
+    falcon_dsp::add_vector_cuda<uint32_t>(vec_a, vec_b, vec_sum);
     
     EXPECT_EQ(vec_sum.size(), NUM_ELEMENTS);
     for (uint32_t ii = 0; ii < NUM_ELEMENTS && ii < vec_sum.size(); ++ii)

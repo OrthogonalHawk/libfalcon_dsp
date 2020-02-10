@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2019 OrthogonalHawk
+# Copyright (c) 2019-2020 OrthogonalHawk
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,10 @@ PLATFORM_BUILD=1
 export PLATFORM_BUILD
 BUILD_OBJS_DIR = build$(LIB_SUFFIX)
 
+# optionally allow a user to build a CPU-only library; defaults to include the
+#  CPU and GPU/CUDA implementations.
+CPU_ONLY ?= 0
+
 ###############################################################################
 # LIBRARY
 ###############################################################################
@@ -57,15 +61,19 @@ CC_SOURCES = \
     src/transform/falcon_dsp_resample.cc \
     src/utilities/falcon_dsp_host_timer.cc \
     src/utilities/falcon_dsp_utils.cc \
-    
-CUDA_SOURCES = \
-    src/math/falcon_dsp_add_cuda.cu \
-    src/transform/falcon_dsp_fir_filter_cuda.cu \
-    src/transform/falcon_dsp_freq_shift_cuda.cu \
-    src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
-    src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
-    src/transform/falcon_dsp_resample_cuda.cu \
-    src/utilities/falcon_dsp_cuda_utils.cu \
+
+# optionally include CUDA source files
+ifneq (,$(filter $(CPU_ONLY),0))
+    CUDA_SOURCES = \
+        src/math/falcon_dsp_add_cuda.cu \
+        src/transform/falcon_dsp_fir_filter_cuda.cu \
+        src/transform/falcon_dsp_freq_shift_cuda.cu \
+        src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
+        src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
+        src/transform/falcon_dsp_resample_cuda.cu \
+        src/utilities/falcon_dsp_cuda_utils.cu \
+        
+endif
     
 ###############################################################################
 # Include ../falcon_makefiles/Makefile.libs for rules

@@ -36,6 +36,10 @@ PLATFORM_BUILD=1
 export PLATFORM_BUILD
 #BUILD_OBJS_DIR = build$(LIB_SUFFIX)
 
+# optionally allow a user to build a CPU-only library; defaults to include the
+#  CPU and GPU/CUDA implementations.
+CPU_ONLY ?= 0
+
 ###############################################################################
 # LIBRARY
 ###############################################################################
@@ -68,20 +72,25 @@ CC_SOURCES = \
     /usr/src/googletest/googletest/src/gtest-all.cc \
     /usr/src/googletest/googlemock/src/gmock-all.cc \
     unit_test_main.cc \
-    
-CUDA_SOURCES = \
-    ../src/math/falcon_dsp_add_cuda.cu \
-    ../src/transform/falcon_dsp_fir_filter_cuda.cu \
-    ../src/transform/falcon_dsp_freq_shift_cuda.cu \
-    ../src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
-    ../src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
-    ../src/transform/falcon_dsp_resample_cuda.cu \
-    ../src/utilities/falcon_dsp_cuda_utils.cu \
-    tests/transform/falcon_dsp_fir_filter_cuda_unit_tests.cu \
-    tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
-    tests/transform/falcon_dsp_multi_rate_channelizer_cuda_unit_tests.cu \
-    tests/transform/falcon_dsp_polyphase_resample_cuda_unit_tests.cu \
-    unit_test_cuda_init.cu \
+
+# optionally include CUDA source files
+ifneq (,$(filter $(CPU_ONLY),0))
+    CUDA_SOURCES = \
+        ../src/math/falcon_dsp_add_cuda.cu \
+        ../src/transform/falcon_dsp_fir_filter_cuda.cu \
+        ../src/transform/falcon_dsp_freq_shift_cuda.cu \
+        ../src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
+        ../src/transform/falcon_dsp_polyphase_resampler_cuda.cu \
+        ../src/transform/falcon_dsp_resample_cuda.cu \
+        ../src/utilities/falcon_dsp_cuda_utils.cu \
+        tests/math/falcon_dsp_math_unit_tests.cu \
+        tests/transform/falcon_dsp_fir_filter_cuda_unit_tests.cu \
+        tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
+        tests/transform/falcon_dsp_multi_rate_channelizer_cuda_unit_tests.cu \
+        tests/transform/falcon_dsp_polyphase_resample_cuda_unit_tests.cu \
+        unit_test_cuda_init.cu \
+
+endif
     
 ###############################################################################
 # Include ../../falcon_makefiles/Makefile.apps for rules
@@ -95,6 +104,10 @@ include ../../falcon_makefiles/Makefile.apps
 
 CPPFLAGS += -Werror -Wall -Wextra -Wcast-align -Wno-type-limits
 CPPFLAGS += -std=c++11 -O3
+
+ifneq (,$(filter $(CPU_ONLY),1))
+    CPPFLAGS += -DCPU_ONLY
+endif
 
 INC_PATH += \
     -I../hdr \
