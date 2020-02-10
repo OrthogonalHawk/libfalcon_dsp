@@ -117,7 +117,15 @@ void run_cuda_freq_shift_test(std::string input_file_name, std::string expected_
 
     EXPECT_EQ(in_data.size(), out_data.size());
     
-    for (uint32_t ii = 0; ii < in_data.size() && ii < out_data.size(); ++ii)
+    std::cout << "Found " << expected_out_data.size()
+              << " samples of expected data and " << out_data.size()
+              << " samples of output data" << std::endl;
+    
+    for (uint32_t ii = 0;
+         ii < in_data.size() &&
+             ii < expected_out_data.size() &&
+             ii < out_data.size();
+         ++ii)
     {            
         ASSERT_NEAR(expected_out_data[ii].real(),
                     out_data[ii].real(), MIN_ALLOWED_DIFF) << " failure at index " << ii;
@@ -184,10 +192,18 @@ void run_cuda_multi_chan_freq_shift_test(std::string input_file_name,
         ASSERT_EQ(in_data.size(), out_iter.size());
     }
     
-    for (uint32_t out_idx = 0; out_idx < expected_out_data.size() && out_idx < out_data.size(); ++out_idx)
+    for (uint32_t out_idx = 0;
+         out_idx < expected_out_data.size() && out_idx < out_data.size();
+         ++out_idx)
     {
+        std::cout << "Found " << expected_out_data[out_idx].size()
+                  << " samples of expected data and " << out_data[out_idx].size()
+                  << " samples of output data" << std::endl;
+        
         for (uint32_t ii = 0;
-             ii < in_data.size() && ii < expected_out_data[out_idx].size();
+             ii < in_data.size() &&
+                 ii < expected_out_data[out_idx].size() &&
+                 ii < out_data[out_idx].size();
              ++ii)
         {       
             ASSERT_NEAR(expected_out_data[out_idx][ii].real(), out_data[out_idx][ii].real(),
@@ -368,8 +384,7 @@ TEST(falcon_dsp_freq_shift, cuda_multi_chan_freq_shift_012)
     
     /* values must match settings in generate_test_vectors.sh */
     const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
-//    std::vector<int32_t> freq_shifts = { 23000, -370400 };
-    std::vector<int32_t> freq_shifts = { -370400, -370400 };  
+    std::vector<int32_t> freq_shifts = { 23000, -370400 }; 
     run_cuda_multi_chan_freq_shift_test(IN_TEST_FILE_NAME,
                                         OUT_TEST_FILE_BASE_NAME,
                                         INPUT_SAMPLE_RATE_IN_SPS,

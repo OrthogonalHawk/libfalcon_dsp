@@ -63,7 +63,6 @@
 
 const bool TIMING_LOGS_ENABLED = false;
 
-const uint32_t MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_FREQ_SHIFT_KERNEL = 4;
 const uint32_t MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL = 1;
 const uint32_t MAX_NUM_CUDA_THREADS = 1024;
 
@@ -427,8 +426,7 @@ namespace falcon_dsp
         }
         
         /* calculate frequency shift kernel parameters */
-        uint32_t num_samples_per_freq_shift_thread = MAX_NUM_INPUT_SAMPLES_FOR_MULTI_CHAN_FREQ_SHIFT_KERNEL;
-        uint32_t samples_per_freq_shift_thread_block = num_samples_per_freq_shift_thread * MAX_NUM_CUDA_THREADS;
+        uint32_t samples_per_freq_shift_thread_block = MAX_NUM_CUDA_THREADS; /* assumes one output per thread */
         uint32_t num_thread_blocks = (in.size() + samples_per_freq_shift_thread_block - 1) /
                                              samples_per_freq_shift_thread_block;
 
@@ -440,7 +438,6 @@ namespace falcon_dsp
         __freq_shift_multi_chan<<<num_thread_blocks, MAX_NUM_CUDA_THREADS, freq_shift_shared_memory_size_in_bytes>>>(
                             d_freq_shift_channels,
                             m_channels.size(),
-                            num_samples_per_freq_shift_thread,
                             m_cuda_input_data,
                             m_max_num_input_samples);
             

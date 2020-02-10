@@ -179,3 +179,16 @@ TEST(falcon_dsp_freq_shift, cpp_freq_shift_012_1)
     run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_NAME,
                             INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
 }
+
+TEST(falcon_dsp_freq_shift, cpp_freq_shift_013_0)
+{
+    std::string IN_TEST_FILE_NAME = "vectors/test_013_x.bin";
+    std::string OUT_TEST_FILE_BASE_NAME = "vectors/test_013_y_shift_264200_hz.bin";
+    
+    /* values must match settings in generate_test_vectors.sh */
+    const uint32_t INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+    const int32_t  FREQ_SHIFT_IN_HZ = 264200;
+    
+    run_cpp_freq_shift_test(IN_TEST_FILE_NAME, OUT_TEST_FILE_BASE_NAME,
+                            INPUT_SAMPLE_RATE_IN_SPS, FREQ_SHIFT_IN_HZ);
+}

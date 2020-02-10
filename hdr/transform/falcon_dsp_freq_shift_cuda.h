@@ -161,7 +161,6 @@ namespace falcon_dsp
     void __freq_shift(uint32_t num_samples_handled_previously,
                       uint32_t time_shift_rollover_sample_idx,
                       double angular_freq,
-                      uint32_t num_samples_to_process_per_thread,
                       cuFloatComplex * in_data,
                       uint32_t in_data_len,
                       cuFloatComplex * out_data,
@@ -171,7 +170,6 @@ namespace falcon_dsp
     __global__
     void __freq_shift_multi_chan(freq_shift_channel_s * channels,
                                  uint32_t num_channels,
-                                 uint32_t num_samples_to_process_per_thread,
                                  cuFloatComplex * in_data,
                                  uint32_t in_data_len);
     

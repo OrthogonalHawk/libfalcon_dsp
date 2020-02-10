@@ -118,14 +118,16 @@ namespace falcon_dsp
         
         out.clear();
         
+        double angle;
+        std::complex<float> shift_angle;
         for (auto it = in.begin(); it != in.end(); ++it)
         {
-            double angle = m_angular_freq * m_samples_handled;
+            angle = m_angular_freq * m_samples_handled;
+            shift_angle = std::complex<float>(cos(angle), sin(angle));
             out.push_back(std::complex<float>((*it).real(), (*it).imag()) *
-                          std::complex<float>(cos(angle),
-                                              sin(angle)));
-            
-            m_samples_handled++;            
+                          shift_angle);
+
+            m_samples_handled++;
             
             if (m_samples_handled >= m_calculated_rollover_sample_idx)
             {
