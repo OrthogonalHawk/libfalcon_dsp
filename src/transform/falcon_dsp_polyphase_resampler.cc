@@ -234,7 +234,7 @@ namespace falcon_dsp
             }
             
             while (x_back_idx <= x_idx)
-            {                
+            {
                 /* by assuming that the filter coefficients are only real (symmetric filter) we can
                  *  bypass multiplication by the imaginary filter coefficients, which will be 0 */
                 acc += std::complex<float>(in[x_back_idx].real() * coeff_iter->real(), in[x_back_idx].imag() * coeff_iter->real());
@@ -282,7 +282,7 @@ namespace falcon_dsp
             // just copy last input samples into state buffer
             for (uint64_t state_copy_idx = 0; state_copy_idx < m_params.state.size(); ++state_copy_idx)
             {
-                m_params.state[state_copy_idx] = in[in.size() - m_params.state.size() + state_copy_idx];   
+                m_params.state[state_copy_idx] = in[in.size() - m_params.state.size() + state_copy_idx];
             }
         }
     }

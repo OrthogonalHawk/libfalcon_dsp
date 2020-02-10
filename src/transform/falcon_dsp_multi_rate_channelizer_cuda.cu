@@ -134,7 +134,7 @@ namespace falcon_dsp
     uint32_t falcon_dsp_multi_rate_channelizer_cuda::internal_multi_rate_channelizer_channel_s::get_num_outputs_for_input(uint32_t input_vector_len)
     {
         /* compute how many outputs will be generated for input_vector_len inputs */
-        uint64_t np = input_vector_len * static_cast<uint64_t>(resampler_params.up_rate);
+        uint64_t np = (resampler_params.state.size() + input_vector_len) * static_cast<uint64_t>(resampler_params.up_rate);
         uint32_t need = np / resampler_params.down_rate;
         
         if ((resampler_params.coeff_phase + resampler_params.up_rate * resampler_params.xOffset) < (np % resampler_params.down_rate))
@@ -185,11 +185,11 @@ namespace falcon_dsp
         
         /* calculate the number of thread blocks that will be required for resampling */
         uint32_t expected_num_outputs = get_num_outputs_for_input(input_vector_len);
-        int64_t resample_x_idx = resampler_params.xOffset;
         uint32_t num_outputs_per_resampler_thread_block =
                 MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL;
         m_num_resampler_thread_blocks = expected_num_outputs / num_outputs_per_resampler_thread_block;
-        if (expected_num_outputs % num_outputs_per_resampler_thread_block != 0)
+        if ( (expected_num_outputs % num_outputs_per_resampler_thread_block != 0) ||
+             (m_num_resampler_thread_blocks == 0 && expected_num_outputs > 0) )
         {
             m_num_resampler_thread_blocks++;
         }
@@ -197,11 +197,11 @@ namespace falcon_dsp
         /* pre-compute resample output parameters */
         uint32_t num_outputs_from_thread_blocks = 0;
         uint32_t new_coeff_phase = resampler_params.coeff_phase;
-        int64_t new_x_idx = resample_x_idx;
+        int64_t new_x_idx = resampler_params.xOffset;
         falcon_dsp::falcon_dsp_polyphase_resampler_cuda::compute_output_params(resampler_params.up_rate,
                                                                                resampler_params.down_rate,
-                                                                               resampler_params.state.size(),
-                                                                               input_vector_len,
+                                                                               resampler_params.state.size() + resampler_params.xOffset,
+                                                                               input_vector_len + resampler_params.state.size(),
                                                                                resampler_params.coeff_phase,
                                                                                expected_num_outputs,
                                                                                num_outputs_from_thread_blocks,
@@ -212,8 +212,7 @@ namespace falcon_dsp
         /* update the channel tracking information preemptively, assuming that if the user
          *  calls the initialize method the parameters will actually be used */
         resampler_params.coeff_phase = new_coeff_phase;
-        resample_x_idx += new_x_idx;
-        resampler_params.xOffset = resample_x_idx - input_vector_len;
+        resampler_params.xOffset = new_x_idx - input_vector_len - resampler_params.state.size();
 
         /* allocate space for the output parameters */
         if (resample_output_params_len != (MAX_NUM_CUDA_THREADS * MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL * m_num_resampler_thread_blocks))
@@ -530,6 +529,7 @@ namespace falcon_dsp
     {
         /* find number of samples retained in buffer */
         int64_t retain = m_channels[chan_idx]->resampler_params.state.size() - input_vector_len;
+
         if (retain > 0)
         {
             /* for input_vector_len smaller than state buffer, copy end of buffer to beginning */
@@ -566,12 +566,12 @@ namespace falcon_dsp
             {
                 /* compute the next index to copy. note that here we need to account for the
                  *  state buffer padding that was added to the resampler input */
-                uint32_t next_idx_to_copy = m_channels[chan_idx]->resampled_data_len -
+                uint32_t next_idx_to_copy = m_channels[chan_idx]->freq_shifted_data_len -
                                                 m_channels[chan_idx]->resampler_params.state.size() +
                                                 state_copy_idx;
                 
                 cudaErrChkAssert(cudaMemcpy(m_channels[chan_idx]->resampler_params.state.data() + state_copy_idx,
-                                            m_channels[chan_idx]->d_resampled_data + next_idx_to_copy,
+                                            m_channels[chan_idx]->d_freq_shifted_data + next_idx_to_copy,
                                             sizeof(std::complex<float>),
                                             cudaMemcpyDeviceToHost));
             }
