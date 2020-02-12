@@ -25,7 +25,7 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_linear_filter.h
+ * @file     falcon_dsp_iir_filter.h
  * @author   OrthogonalHawk
  * @date     20-Jan-2020
  *
