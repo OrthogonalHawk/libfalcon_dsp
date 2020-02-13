@@ -111,9 +111,9 @@ namespace falcon_dsp
         coeffs.clear();
 
         auto rate_pair = std::make_pair(input_sample_rate, output_sample_rate);
-        if (s_predefined_fir_coeffs.count(rate_pair) > 0)
+        if (s_predefined_resample_fir_coeffs.count(rate_pair) > 0)
         {
-            coeffs = s_predefined_fir_coeffs[rate_pair];
+            coeffs = s_predefined_resample_fir_coeffs[rate_pair].coeffs;
             return true;
         }
         else
