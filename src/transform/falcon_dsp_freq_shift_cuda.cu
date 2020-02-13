@@ -40,6 +40,7 @@
  *
  * 04-Jun-2019  OrthogonalHawk  File created.
  * 19-Jan-2020  OrthogonalHawk  Refactored to use falcon_dsp_freq_shift_cuda.h
+ * 12-Feb-2020  OrthogonalHawk  Updated to use an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -60,9 +61,6 @@
  *****************************************************************************/
 
 const bool TIMING_LOGS_ENABLED = false;
-
-const uint32_t DUMMY_SAMPLE_RATE_IN_SPS = 1e6;
-const float DUMMY_FREQ_SHIFT_IN_HZ = 0.0;
 
 const uint32_t MAX_NUM_CUDA_THREADS = 1024;
 
@@ -92,15 +90,15 @@ namespace falcon_dsp
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
                          int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out)
     {
-        falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
-        return freq_shifter.apply(in, out);
+        falcon_dsp_freq_shift_cuda freq_shifter;
+        return freq_shifter.initialize(in_sample_rate_in_sps, freq_shift_in_hz) && freq_shifter.apply(in, out);
     }
     
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                          int32_t freq_shift_in_hz, std::vector<std::complex<float>>& out)
     {        
-        falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
-        return freq_shifter.apply(in, out);
+        falcon_dsp_freq_shift_cuda freq_shifter;
+        return freq_shifter.initialize(in_sample_rate_in_sps, freq_shift_in_hz) && freq_shifter.apply(in, out);
     }
     
     /* @brief CUDA implementation of a multi-channel frequency shift vector operation.
@@ -116,8 +114,8 @@ namespace falcon_dsp
     bool freq_shift_cuda(uint32_t in_sample_rate_in_sps, std::vector<std::complex<float>>& in,
                          std::vector<int32_t>& freq_shift_in_hz, std::vector<std::vector<std::complex<float>>>& out)
     {
-        falcon_dsp_freq_shift_cuda freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
-        return freq_shifter.apply(in, out);
+        falcon_dsp_freq_shift_cuda freq_shifter;
+        return freq_shifter.initialize(in_sample_rate_in_sps, freq_shift_in_hz) && freq_shifter.apply(in, out);
     }
     
     /* CUDA kernel function that applies a frequency shift and puts the shifted data
@@ -221,54 +219,11 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
-      : falcon_dsp_freq_shift(DUMMY_SAMPLE_RATE_IN_SPS, DUMMY_FREQ_SHIFT_IN_HZ),
+    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(void)
+      : falcon_dsp_freq_shift(),
         m_cuda_input_data(nullptr),
         m_max_num_input_samples(0)
-    {
-        /* user is only requesting a single channel */
-        auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate_in_sps, freq_shift_in_hz);
-        std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
-        new_chan->time_shift_rollover_sample_idx = chan_params.first;
-        new_chan->angular_freq = chan_params.second;
-
-        m_freq_shift_channels.push_back(std::move(new_chan));
-        
-        /* allocate CUDA memory for the channel information; the master copy is kept
-         *  on the host, but is copied to the device when the 'apply' method is invoked */
-        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
-                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
-                                           
-        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
-         *  can better handle complex<float> data, which is natively 8 bytes in size */
-        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
-    }
-
-    falcon_dsp_freq_shift_cuda::falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz)
-      : falcon_dsp_freq_shift(DUMMY_SAMPLE_RATE_IN_SPS, DUMMY_FREQ_SHIFT_IN_HZ),
-        m_cuda_input_data(nullptr),
-        m_max_num_input_samples(0)
-    {
-        /* user is requesting multiple channels */
-        for (auto freq_shift : freq_shift_in_hz)
-        {
-            auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate, freq_shift);
-            std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
-            new_chan->time_shift_rollover_sample_idx = chan_params.first;
-            new_chan->angular_freq = chan_params.second;
-
-            m_freq_shift_channels.push_back(std::move(new_chan));
-        }
-          
-        /* allocate CUDA memory for the channel information; the master copy is kept
-         *  on the host, but is copied to the device when the 'apply' method is invoked */
-        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
-                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
-
-        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
-         *  can better handle complex<float> data, which is natively 8 bytes in size */
-        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
-    }
+    { }
     
     falcon_dsp_freq_shift_cuda::~falcon_dsp_freq_shift_cuda(void)
     {
@@ -287,8 +242,71 @@ namespace falcon_dsp
         }
     }
 
+    bool falcon_dsp_freq_shift_cuda::initialize(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (m_initialized)
+        {
+            return false;
+        }
+        
+        /* user is only requesting a single channel */
+        auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate_in_sps, freq_shift_in_hz);
+        std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
+        new_chan->time_shift_rollover_sample_idx = chan_params.first;
+        new_chan->angular_freq = chan_params.second;
+
+        m_freq_shift_channels.push_back(std::move(new_chan));
+        
+        /* allocate CUDA memory for the channel information; the master copy is kept
+         *  on the host, but is copied to the device when the 'apply' method is invoked */
+        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
+                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
+                                           
+        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+         *  can better handle complex<float> data, which is natively 8 bytes in size */
+        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
+        
+        m_initialized = true;
+        return m_initialized;
+    }
+
+    bool falcon_dsp_freq_shift_cuda::initialize(uint32_t input_sample_rate_in_sps, std::vector<int32_t> freq_shift_in_hz)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (m_initialized)
+        {
+            return false;
+        }
+        
+        /* user is requesting multiple channels */
+        for (auto freq_shift : freq_shift_in_hz)
+        {
+            auto chan_params = falcon_dsp_freq_shift::get_freq_shift_params(input_sample_rate_in_sps, freq_shift);
+            std::unique_ptr<freq_shift_channel_s> new_chan = std::make_unique<freq_shift_channel_s>();
+            new_chan->time_shift_rollover_sample_idx = chan_params.first;
+            new_chan->angular_freq = chan_params.second;
+
+            m_freq_shift_channels.push_back(std::move(new_chan));
+        }
+          
+        /* allocate CUDA memory for the channel information; the master copy is kept
+         *  on the host, but is copied to the device when the 'apply' method is invoked */
+        cudaErrChkAssert(cudaMallocManaged(&d_freq_shift_channels,
+                                           m_freq_shift_channels.size() * sizeof(freq_shift_channel_s)));
+
+        /* change the shared memory size to 8 bytes per shared memory bank. this is so that we
+         *  can better handle complex<float> data, which is natively 8 bytes in size */
+        cudaErrChkAssert(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
+        
+        m_initialized = true;
+        return m_initialized;
+    }
+
     bool falcon_dsp_freq_shift_cuda::apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out)
-    {       
+    {
         /* create another copy of the data and cast to std::complex<float> */
         std::vector<std::complex<float>> tmp_in_vec;
         tmp_in_vec.reserve(in.size());
@@ -338,12 +356,17 @@ namespace falcon_dsp
     {   
         std::lock_guard<std::mutex> lock(std::mutex);
         
-        /* clear the output data structures and resize so that they can hold the shifted
+        out.clear();
+        if (!m_initialized)
+        {
+            return false;
+        }
+        
+        /* resize the output data structures so that they can hold the shifted
          *  data. note that by using resize() the vector size is now equal to in.size()
          *  even without explicitly adding data to the vector, which means that we can
          *  add data directly into the vector data buffer without worrying about the
          *  vector size getting mismatched with the buffer contents */
-        out.clear();
         out.resize(m_freq_shift_channels.size());
         for (uint32_t chan_idx = 0; chan_idx < m_freq_shift_channels.size(); ++chan_idx)
         {

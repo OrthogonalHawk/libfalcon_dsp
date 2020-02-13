@@ -261,7 +261,8 @@ void run_cuda_multi_chan_freq_shift_by_segment_test(std::string input_file_name,
 
     /* now frequency shift the input in multiple segments and verify that the combined
      *  calculated output matches the expected output */
-    falcon_dsp::falcon_dsp_freq_shift_cuda shifter(input_sample_rate_in_sps, freq_shift_channels);
+    falcon_dsp::falcon_dsp_freq_shift_cuda shifter;
+    EXPECT_TRUE(shifter.initialize(input_sample_rate_in_sps, freq_shift_channels));
     std::vector<std::vector<std::complex<float>>> out_data;
     out_data.resize(freq_shift_channels.size());
     

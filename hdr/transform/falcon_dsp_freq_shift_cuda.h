@@ -40,6 +40,7 @@
  * @section  HISTORY
  *
  * 19-Jan-2020  OrthogonalHawk  File broken out from falcon_dsp_transform.h
+ * 12-Feb-2020  OrthogonalHawk  Updated to use an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -187,14 +188,14 @@ namespace falcon_dsp
     {
     public:
         
-        falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, int32_t freq_shift_in_hz);
-        falcon_dsp_freq_shift_cuda(uint32_t input_sample_rate, std::vector<int32_t> freq_shift_in_hz);
-
+        falcon_dsp_freq_shift_cuda(void);
         ~falcon_dsp_freq_shift_cuda(void);
-        
-        falcon_dsp_freq_shift_cuda(void) = delete;
+
         falcon_dsp_freq_shift_cuda(const falcon_dsp_freq_shift_cuda&) = delete;
-        
+
+        bool initialize(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz) override;
+        bool initialize(uint32_t input_sample_rate_in_sps, std::vector<int32_t> freq_shift_in_hz);
+
         bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out) override;
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
         bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);

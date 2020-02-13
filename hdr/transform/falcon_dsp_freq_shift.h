@@ -40,6 +40,7 @@
  * @section  HISTORY
  *
  * 19-Jan-2020  OrthogonalHawk  File broken out from falcon_dsp_transform.h
+ * 12-Feb-2020  OrthogonalHawk  Updated to use an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -100,12 +101,12 @@ namespace falcon_dsp
 
         static std::pair<uint32_t, double> get_freq_shift_params(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
 
-        falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
+        falcon_dsp_freq_shift(void);
         virtual ~falcon_dsp_freq_shift(void) = default;
 
-        falcon_dsp_freq_shift(void) = delete;
         falcon_dsp_freq_shift(const falcon_dsp_freq_shift&) = delete;
 
+        virtual bool initialize(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz);
         void reset_state(void);
         virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
         virtual bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
@@ -113,6 +114,7 @@ namespace falcon_dsp
     protected:
 
         std::mutex m_mutex;
+        bool       m_initialized;
         double     m_samples_handled;
         uint32_t   m_calculated_rollover_sample_idx;
         double     m_angular_freq;

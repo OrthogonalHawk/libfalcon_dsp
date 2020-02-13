@@ -78,7 +78,7 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/    
     falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate, const multi_rate_channelizer_channel_s& other)
-      : freq_shifter(input_sample_rate, other.freq_shift_in_hz),
+      : freq_shifter(),
         resampler(other.up_rate, other.down_rate, other.resample_filter_coeffs)
     {
         output_sample_rate_in_sps = other.output_sample_rate_in_sps;
@@ -86,6 +86,8 @@ namespace falcon_dsp
         up_rate = other.up_rate;
         down_rate = other.down_rate;
         resample_filter_coeffs = other.resample_filter_coeffs;
+          
+        freq_shifter.initialize(input_sample_rate, other.freq_shift_in_hz);
     }
             
     falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::~internal_multi_rate_cpp_channelizer_channel_s(void)

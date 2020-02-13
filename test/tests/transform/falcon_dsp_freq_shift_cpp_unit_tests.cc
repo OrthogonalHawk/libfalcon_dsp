@@ -40,6 +40,7 @@
  *
  * 08-Jun-2019  OrthogonalHawk  File created.
  * 20-Jan-2020  OrthogonalHawk  Renamed file to include 'cpp' substring.
+ * 12-Feb-2020  OrthogonalHawk  Updated to use 'initialize' method.
  *
  *****************************************************************************/
 

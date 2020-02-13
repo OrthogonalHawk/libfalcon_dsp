@@ -40,6 +40,7 @@
  *
  * 04-Jun-2019  OrthogonalHawk  File created.
  * 20-Jan-2020  OrthogonalHawk  Update to reflect movement from falcon_dsp_transform.h
+ * 12-Feb-2020  OrthogonalHawk  Updated to use an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -55,6 +56,9 @@
 /******************************************************************************
  *                                 CONSTANTS
  *****************************************************************************/
+
+const uint32_t DUMMY_INPUT_SAMPLE_RATE_IN_SPS = 1e6;
+const int32_t DUMMY_FREQ_SHIFT_IN_HZ = 1e3;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -86,8 +90,8 @@ namespace falcon_dsp
     bool freq_shift(uint32_t in_sample_rate_in_sps, std::vector<std::complex<int16_t>>& in,
                     int32_t freq_shift_in_hz, std::vector<std::complex<int16_t>>& out)
     {
-        falcon_dsp_freq_shift freq_shifter(in_sample_rate_in_sps, freq_shift_in_hz);
-        return freq_shifter.apply(in, out);
+        falcon_dsp_freq_shift freq_shifter;
+        return freq_shifter.initialize(in_sample_rate_in_sps, freq_shift_in_hz) && freq_shifter.apply(in, out);
     }
     
     
@@ -95,12 +99,26 @@ namespace falcon_dsp
      *                            CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_freq_shift::falcon_dsp_freq_shift(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
-      : m_samples_handled(0)
+    falcon_dsp_freq_shift::falcon_dsp_freq_shift(void)
+      : m_initialized(false),
+        m_samples_handled(0)
+    { }
+    
+    bool falcon_dsp_freq_shift::initialize(uint32_t input_sample_rate_in_sps, int32_t freq_shift_in_hz)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (m_initialized)
+        {
+            return false;
+        }
+        
         auto params = get_freq_shift_params(input_sample_rate_in_sps, freq_shift_in_hz);
         m_calculated_rollover_sample_idx = params.first;
         m_angular_freq = params.second;
+        
+        m_initialized = true;
+        return m_initialized;
     }
     
     void falcon_dsp_freq_shift::reset_state(void)
@@ -117,6 +135,11 @@ namespace falcon_dsp
         std::lock_guard<std::mutex> lock(std::mutex);
         
         out.clear();
+        
+        if (!m_initialized)
+        {
+            return false;
+        }
         
         double angle;
         std::complex<float> shift_angle;
@@ -144,6 +167,11 @@ namespace falcon_dsp
         
         out.clear();
 
+        if (!m_initialized)
+        {
+            return false;
+        }
+        
         double angle;
         std::complex<float> shift_angle;
         for (auto it = in.begin(); it != in.end(); ++it)
