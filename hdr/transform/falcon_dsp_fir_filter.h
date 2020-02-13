@@ -88,15 +88,18 @@ namespace falcon_dsp
     bool fir_filter(std::vector<std::complex<float>> &coeffs, std::vector<std::complex<float>>& in,
                     std::vector<std::complex<float>>& out);
     
-    /* @brief Provides FIR filter coefficients intended for anti-alias protection
+    /* @brief Provides FIR filter parameters intended for anti-alias protection
      *         during resampling operations.
      * @param[in] input_sample_rate     - input sample rate in samples per second
      * @param[in] output_sample_rate    - output sample rate in samples per second
+     * @param[out] up_rate              - upsample rate
+     * @param[out] down_rate            - downsample rate
      * @param[out] coeffs               - filter coefficients
      * @return True if suitable filter coefficients were found/computed;
      *          false otherwise.
      */
-    bool get_resample_fir_coeffs(uint32_t input_sample_rate, uint32_t output_sample_rate,
+    bool get_resample_fir_params(uint32_t input_sample_rate, uint32_t output_sample_rate,
+                                 uint32_t& up_rate, uint32_t& down_rate,
                                  std::vector<std::complex<float>> &coeffs);
     
     /******************************************************************************

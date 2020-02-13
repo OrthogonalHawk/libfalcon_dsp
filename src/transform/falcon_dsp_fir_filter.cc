@@ -97,15 +97,18 @@ namespace falcon_dsp
         return filter_obj.apply(in, out);
     }
     
-    /* @brief Provides FIR filter coefficients intended for anti-alias protection
+    /* @brief Provides FIR filter parameters intended for anti-alias protection
      *         during resampling operations.
      * @param[in] input_sample_rate     - input sample rate in samples per second
      * @param[in] output_sample_rate    - output sample rate in samples per second
+     * @param[out] up_rate              - upsample rate
+     * @param[out] down_rate            - downsample rate
      * @param[out] coeffs               - filter coefficients
      * @return True if suitable filter coefficients were found/computed;
      *          false otherwise.
      */
-    bool get_resample_fir_coeffs(uint32_t input_sample_rate, uint32_t output_sample_rate,
+    bool get_resample_fir_params(uint32_t input_sample_rate, uint32_t output_sample_rate,
+                                 uint32_t& up_rate, uint32_t& down_rate,
                                  std::vector<std::complex<float>> &coeffs)
     {
         coeffs.clear();
@@ -113,6 +116,8 @@ namespace falcon_dsp
         auto rate_pair = std::make_pair(input_sample_rate, output_sample_rate);
         if (s_predefined_resample_fir_coeffs.count(rate_pair) > 0)
         {
+            up_rate = s_predefined_resample_fir_coeffs[rate_pair].up_rate;
+            down_rate = s_predefined_resample_fir_coeffs[rate_pair].down_rate;
             coeffs = s_predefined_resample_fir_coeffs[rate_pair].coeffs;
             return true;
         }
