@@ -41,6 +41,7 @@
  *
  * 20-Jan-2020  OrthogonalHawk  Created file.
  * 22-Jan-2020  OrthogonalHawk  Renamed to focus on IIR filtering.
+ * 13-Feb-2020  OrthogonalHawk  Added an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -102,12 +103,12 @@ namespace falcon_dsp
     {
     public:
 
-        falcon_dsp_iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs);
+        falcon_dsp_iir_filter(void);
         virtual ~falcon_dsp_iir_filter(void) = default;
 
-        falcon_dsp_iir_filter(void) = delete;
         falcon_dsp_iir_filter(const falcon_dsp_iir_filter&) = delete;
 
+        virtual bool initialize(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs);
         void reset_state(void);
         virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
         virtual bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
@@ -115,6 +116,7 @@ namespace falcon_dsp
     protected:
     
         std::mutex                               m_mutex;
+        bool                                     m_initialized;
         std::vector<std::complex<float>>         m_b_coefficients;
         std::vector<std::complex<float>>         m_a_coefficients;
         std::vector<std::complex<float>>         m_input_state;

@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 22-Jan-2020  OrthogonalHawk  File created.
+ * 13-Feb-2020  OrthogonalHawk  Updated to use 'initialize' method.
  *
  *****************************************************************************/
 
@@ -162,7 +163,8 @@ TEST(falcon_dsp_iir_filter, cpp_basic_filter_uint16_t_000)
     std::vector<std::complex<int16_t>> out_data;
     std::vector<std::complex<int16_t>> expected_out_data = { {0, 0}, {2, 0}, {-2, 0}, {6, 0}, {-10, 0} };
     
-    falcon_dsp::falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
+    falcon_dsp::falcon_dsp_iir_filter filter_obj;
+    EXPECT_TRUE(filter_obj.initialize(b_coeffs, a_coeffs));
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -192,7 +194,8 @@ TEST(falcon_dsp_iir_filter, cpp_basic_filter_float_000)
     std::vector<std::complex<float>> out_data;
     std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {-2.0, 0.0} };
     
-    falcon_dsp::falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
+    falcon_dsp::falcon_dsp_iir_filter filter_obj;
+    EXPECT_TRUE(filter_obj.initialize(b_coeffs, a_coeffs));
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -222,7 +225,8 @@ TEST(falcon_dsp_iir_filter, cpp_basic_filter_float_001)
     std::vector<std::complex<float>> out_data;
     std::vector<std::complex<float>> expected_out_data = { {0.0, 0.0}, {1.0, 0.0}, {0.1, 0.0}, {0.11, 0.0}, {0.821, 0.0} };
     
-    falcon_dsp::falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
+    falcon_dsp::falcon_dsp_iir_filter filter_obj;
+    EXPECT_TRUE(filter_obj.initialize(b_coeffs, a_coeffs));
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     
@@ -252,7 +256,8 @@ TEST(falcon_dsp_iir_filter, cpp_basic_filter_float_002)
     std::vector<std::complex<float>> out_data;
     std::vector<std::complex<float>> expected_out_data = { {0.0, 0.0}, {3.0, 0.0}, {6.1, 0.0}, {7.8, 0.0}, {8.81, 0.0} };
     
-    falcon_dsp::falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
+    falcon_dsp::falcon_dsp_iir_filter filter_obj;
+    EXPECT_TRUE(filter_obj.initialize(b_coeffs, a_coeffs));
     EXPECT_TRUE(filter_obj.apply(in_data, out_data));
     EXPECT_EQ(out_data.size(), in_data.size());
     

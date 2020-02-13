@@ -40,6 +40,7 @@
  *
  * 20-Jan-2020  OrthogonalHawk  File created.
  * 22-Jan-2020  OrthogonalHawk  Renamed file to focus on IIR filtering.
+ * 13-Feb-2020  OrthogonalHawk  Added an 'initialize' method.
  *
  *****************************************************************************/
 
@@ -85,15 +86,15 @@ namespace falcon_dsp
     bool iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs, 
                     std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out)
     {
-        falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
-        return filter_obj.apply(in, out);
+        falcon_dsp_iir_filter filter_obj;
+        return filter_obj.initialize(b_coeffs, a_coeffs) && filter_obj.apply(in, out);
     }
     
     bool iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs, 
                     std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
     {
-        falcon_dsp_iir_filter filter_obj(b_coeffs, a_coeffs);
-        return filter_obj.apply(in, out);
+        falcon_dsp_iir_filter filter_obj;
+        return filter_obj.initialize(b_coeffs, a_coeffs) && filter_obj.apply(in, out);
     }
     
 
@@ -101,8 +102,29 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_iir_filter::falcon_dsp_iir_filter(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs)
+    falcon_dsp_iir_filter::falcon_dsp_iir_filter(void)
+      : m_initialized(false)
+    { }
+    
+    void falcon_dsp_iir_filter::reset_state(void)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        /* reset the state information; an end-user might invoke this function if processing
+         *  non-continuous data */
+        m_input_state.clear();
+        m_prev_outputs.clear();
+    }
+
+    bool falcon_dsp_iir_filter::initialize(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (m_initialized)
+        {
+            return false;
+        }
+        
         m_b_coefficients = b_coeffs;
         m_a_coefficients = a_coeffs;
                 
@@ -127,23 +149,16 @@ namespace falcon_dsp
         }
         
         m_input_state.reserve(b_coeffs.size());
+        
+        m_initialized = true;
+        return m_initialized;
     }
     
-    void falcon_dsp_iir_filter::reset_state(void)
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        
-        /* reset the state information; an end-user might invoke this function if processing
-         *  non-continuous data */
-        m_input_state.clear();
-        m_prev_outputs.clear();
-    }
-
     bool falcon_dsp_iir_filter::apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out)
     {
         out.clear();
         out.reserve(in.size());
-        
+
         /* create another copy of the data and cast to std::complex<float> */
         std::vector<std::complex<float>> tmp_in_vec;
         tmp_in_vec.reserve(in.size());
@@ -200,6 +215,11 @@ namespace falcon_dsp
         
         out.clear();
         out.reserve(in.size());
+        
+        if (!m_initialized)
+        {
+            return false;
+        }
         
         /* sanity check the class configuration and inputs */
         if (m_b_coefficients.size() == 0 ||
