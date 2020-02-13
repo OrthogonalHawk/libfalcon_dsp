@@ -39,6 +39,7 @@
  * @section  HISTORY
  *
  * 03-Sep-2019  OrthogonalHawk  File created.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use resampler 'initialize' method.
  *
  *****************************************************************************/
 
@@ -173,7 +174,8 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_001)
      ********************************************************/
     
     std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler;
+    EXPECT_TRUE(resampler.initialize(1, 2, coeffs));
     
     std::vector<std::complex<float>> in_data = { {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0},
                                                  {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0} };
@@ -205,7 +207,8 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_002)
      ********************************************************/
     
     std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler;
+    EXPECT_TRUE(resampler.initialize(1, 2, coeffs));
     
     std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
     std::vector<std::complex<float>> expected_out_data(501, std::complex<float>(3.5, 0.0));
@@ -238,7 +241,8 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_003)
     
     std::vector<std::complex<float>> coeffs = { {0.5,  0.0}, {0.5, 0.0}, {1.0, 0.0}, {0.3, 0.0},
                                                 {0.07, 0.0}, {0.1, 0.0}, {0.4, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(1, 2, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler;
+    EXPECT_TRUE(resampler.initialize(1, 2, coeffs));
     
     std::vector<std::complex<float>> in_data(1000, std::complex<float>(1.0, 0.0));
     std::vector<std::complex<float>> expected_out_data(503, std::complex<float>(2.87, 0.0));
@@ -275,7 +279,8 @@ TEST(falcon_dsp_resample_cuda, basic_cuda_resample_004)
      ********************************************************/
     
     std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler(4, 5, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler_cuda resampler;
+    EXPECT_TRUE(resampler.initialize(4, 5, coeffs));
     
     std::vector<std::complex<float>> in_data(10, std::complex<float>(1.0, 0.0));
     std::vector<std::complex<float>> expected_out_data = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {0.0, 0.0},

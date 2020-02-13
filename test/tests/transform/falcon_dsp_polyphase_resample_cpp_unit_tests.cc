@@ -42,6 +42,7 @@
  * 20-Jan-2020  OrthogonalHawk  Adding cpp_resample_009 and updating to reflect
  *                               library refactoring. Also renamed to include 'cpp'
  *                               substring in file name.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use resampler 'initialize' method.
  *
  *****************************************************************************/
 
@@ -175,7 +176,8 @@ TEST(falcon_dsp_resample, basic_cpp_resample_001)
      ********************************************************/
     
     std::vector<std::complex<float>> coeffs = { {0.5, 0.0}, {1.0, 0.0}, {2.0, 0.0} };
-    falcon_dsp::falcon_dsp_polyphase_resampler resampler(1, 2, coeffs);
+    falcon_dsp::falcon_dsp_polyphase_resampler resampler;
+    EXPECT_TRUE(resampler.initialize(1, 2, coeffs));
     
     std::vector<std::complex<float>> in_data = { {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0},
                                                  {1.0, 0.0}, {1.0, 0.0}, {1.0, 0.0} };

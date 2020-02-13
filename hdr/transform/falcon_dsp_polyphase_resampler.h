@@ -106,6 +106,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 21-Apr-2019  OrthogonalHawk  File created.
  * 24-Jan-2020  OrthogonalHawk  Switched to fully specified class instead of
  *                               templated class.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use 'initialize' method.
  *
  *****************************************************************************/
 
@@ -168,13 +169,13 @@ namespace falcon_dsp
     {
     public:
 
-        falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
-                                       const std::vector<std::complex<float>>& filter_coeffs);
+        falcon_dsp_polyphase_resampler(void);
         virtual ~falcon_dsp_polyphase_resampler(void);
 
-        falcon_dsp_polyphase_resampler(void) = delete;
         falcon_dsp_polyphase_resampler(const falcon_dsp_polyphase_resampler&) = delete;
 
+        virtual bool initialize(uint32_t up_rate, uint32_t down_rate,
+                                const std::vector<std::complex<float>>& filter_coeffs);
         void reset_state(void);
         virtual int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
         uint32_t        needed_out_count(uint32_t inCount);
@@ -182,9 +183,11 @@ namespace falcon_dsp
 
     protected:
     
+        uint32_t _needed_out_count(uint32_t inCount);
         void _manage_state(std::vector<std::complex<float>>& in);
         
         std::mutex                           m_mutex;
+        bool                                 m_initialized;
         polyphase_resampler_params_s         m_params;
     };
 }

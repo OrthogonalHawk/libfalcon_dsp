@@ -80,6 +80,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 21-Apr-2019  OrthogonalHawk  File created.
  * 24-Jan-2020  OrthogonalHawk  Switched to fully specified polyphase resample
  *                               class instead of templated class.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use 'initialize' method.
  *
  *****************************************************************************/
 
@@ -131,8 +132,8 @@ namespace falcon_dsp
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler resampler(up_rate, down_rate, filter_coeffs);
-        return resampler.apply(in, out) > 0;
+        falcon_dsp_polyphase_resampler resampler;
+        return resampler.initialize(up_rate, down_rate, filter_coeffs) && (resampler.apply(in, out) > 0);
     }
     
     /* @brief Same implementation as 'resample', just with a different name. The "up"

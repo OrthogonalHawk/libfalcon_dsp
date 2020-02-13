@@ -41,6 +41,7 @@
  * @section  HISTORY
  *
  * 29-Jan-2020  OrthogonalHawk  File created.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use 'initialize' method.
  *
  *****************************************************************************/
 
@@ -79,7 +80,7 @@ namespace falcon_dsp
      *****************************************************************************/    
     falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate, const multi_rate_channelizer_channel_s& other)
       : freq_shifter(),
-        resampler(other.up_rate, other.down_rate, other.resample_filter_coeffs)
+        resampler()
     {
         output_sample_rate_in_sps = other.output_sample_rate_in_sps;
         freq_shift_in_hz = other.freq_shift_in_hz;
@@ -88,6 +89,7 @@ namespace falcon_dsp
         resample_filter_coeffs = other.resample_filter_coeffs;
           
         freq_shifter.initialize(input_sample_rate, other.freq_shift_in_hz);
+        resampler.initialize(other.up_rate, other.down_rate, other.resample_filter_coeffs);
     }
             
     falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::~internal_multi_rate_cpp_channelizer_channel_s(void)

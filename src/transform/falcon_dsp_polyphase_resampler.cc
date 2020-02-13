@@ -80,6 +80,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 21-Apr-2019  OrthogonalHawk  File created.
  * 24-Jan-2020  OrthogonalHawk  Switched to fully specified class instead of
  *                               templated class.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use 'initialize' method.
  *
  *****************************************************************************/
 
@@ -170,14 +171,28 @@ namespace falcon_dsp
         xOffset = 0;
     }
     
-    falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(uint32_t up_rate, uint32_t down_rate,
-                                                                   const std::vector<std::complex<float>>& filter_coeffs)
-    {
-        m_params.initialize(up_rate, down_rate, filter_coeffs);
-    }
+    falcon_dsp_polyphase_resampler::falcon_dsp_polyphase_resampler(void)
+      : m_initialized(false)
+    { }
     
     falcon_dsp_polyphase_resampler::~falcon_dsp_polyphase_resampler(void)
     { }
+    
+    bool falcon_dsp_polyphase_resampler::initialize(uint32_t up_rate, uint32_t down_rate,
+                                                    const std::vector<std::complex<float>>& filter_coeffs)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (m_initialized)
+        {
+            return false;
+        }
+        
+        m_params.initialize(up_rate, down_rate, filter_coeffs);
+        m_initialized = true;
+        
+        return m_initialized;
+    }
     
     void falcon_dsp_polyphase_resampler::reset_state(void)
     {
@@ -188,6 +203,18 @@ namespace falcon_dsp
     
     uint32_t falcon_dsp_polyphase_resampler::needed_out_count(uint32_t in_count)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        if (!m_initialized)
+        {
+            return 0;
+        }
+        
+        return _needed_out_count(in_count);
+    }
+    
+    uint32_t falcon_dsp_polyphase_resampler::_needed_out_count(uint32_t in_count)
+    {       
         /* compute how many outputs will be generated for in_count inputs */
         uint64_t np = in_count * static_cast<uint64_t>(m_params.up_rate);
         uint32_t need = np / m_params.down_rate;
@@ -205,6 +232,11 @@ namespace falcon_dsp
         std::lock_guard<std::mutex> lock(std::mutex);
         
         out.clear();
+        
+        if (!m_initialized)
+        {
+            return out.size();
+        }
         
         /* x_idx points to the latest processed input sample */
         int64_t x_idx = m_params.xOffset;

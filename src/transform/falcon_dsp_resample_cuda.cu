@@ -78,6 +78,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * @section  HISTORY
  *
  * 03-Sep-2019  OrthogonalHawk  File created.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use resampler 'initialize' method.
  *
  *****************************************************************************/
 
@@ -129,9 +130,8 @@ namespace falcon_dsp
         double decimal = static_cast<double>(out_sample_rate_in_sps) / static_cast<double>(in_sample_rate_in_sps);
         rat_approx(decimal, 1024, up_rate, down_rate);
         
-        falcon_dsp_polyphase_resampler_cuda resampler(up_rate, down_rate, filter_coeffs);
-        
-        return resampler.apply(in, out) > 0;
+        falcon_dsp_polyphase_resampler_cuda resampler;
+        return resampler.initialize(up_rate, down_rate, filter_coeffs) && (resampler.apply(in, out) > 0);
     }
     
     /* @brief Same implementation as 'resample_cuda', just with a different name. The "up"

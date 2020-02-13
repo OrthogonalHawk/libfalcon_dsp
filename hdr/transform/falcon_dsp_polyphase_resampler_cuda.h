@@ -108,6 +108,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *                               fully specified class from templated class.
  * 31-Jan-2020  OrthogonalHawk  Added optimized resampler kernel for a single
  *                               output per thread.
+ * 13-Feb-2020  OrthogonalHawk  Switch to use resampler 'initialize' method.
  *
  *****************************************************************************/
 
@@ -196,19 +197,14 @@ namespace falcon_dsp
                                           int64_t& new_x_idx,
                                           std::vector<polyphase_resampler_output_params_s>& params);
 
-        falcon_dsp_polyphase_resampler_cuda(uint32_t up_rate, uint32_t down_rate,
-                                            std::vector<std::complex<float>>& filter_coeffs);
+        falcon_dsp_polyphase_resampler_cuda(void);
         ~falcon_dsp_polyphase_resampler_cuda(void);
         
+        bool initialize(uint32_t up_rate, uint32_t down_rate,
+                        const std::vector<std::complex<float>>& filter_coeffs) override;
         int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out) override;
     
     private:
-        
-        void compute_next_filter_params(int64_t cur_x_idx, size_t in_size, uint32_t cur_coeff_phase,
-                                        uint32_t max_out_samples,
-                                        uint32_t& num_out_samples,
-                                        uint32_t& new_coeff_phase,
-                                        int64_t& new_x_idx);
 
         uint32_t get_average_advance_in_samples(void);
 
