@@ -52,6 +52,7 @@ LIB = lib/libfalcon_dsp$(LIB_SUFFIX).a
 
 CC_SOURCES = \
     src/math/falcon_dsp_add.cc \
+    src/signals/falcon_dsp_fm_demod.cc \
     src/transform/falcon_dsp_freq_shift.cc \
     src/transform/falcon_dsp_fir_filter.cc \
     src/transform/falcon_dsp_iir_filter.cc \

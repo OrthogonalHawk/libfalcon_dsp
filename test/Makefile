@@ -52,6 +52,7 @@ EXE = bin/falcon_dsp_unit_tests
 
 CC_SOURCES = \
     ../src/math/falcon_dsp_add.cc \
+    ../src/signals/falcon_dsp_fm_demod.cc \
     ../src/transform/falcon_dsp_freq_shift.cc \
     ../src/transform/falcon_dsp_fir_filter.cc \
     ../src/utilities/falcon_dsp_host_timer.cc \
