@@ -110,6 +110,10 @@ namespace falcon_dsp
 
         virtual bool initialize(std::vector<std::complex<float>> &b_coeffs, std::vector<std::complex<float>> &a_coeffs);
         void reset_state(void);
+
+        virtual bool apply(std::vector<int16_t>& in, std::vector<int16_t>& out);
+        virtual bool apply(std::vector<float>& in, std::vector<float>& out);
+
         virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out);
         virtual bool apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
 

@@ -154,6 +154,58 @@ namespace falcon_dsp
         return m_initialized;
     }
     
+    bool falcon_dsp_iir_filter::apply(std::vector<int16_t>& in, std::vector<int16_t>& out)
+    {
+        out.clear();
+        out.reserve(in.size());
+
+        /* create another copy of the data and cast to std::complex<float> */
+        std::vector<std::complex<float>> tmp_in_vec;
+        tmp_in_vec.reserve(in.size());
+        for (auto in_iter = in.begin(); in_iter != in.end(); ++in_iter)
+        {
+            tmp_in_vec.push_back(std::complex<float>((*in_iter), 0.0));
+        }
+
+        /* filter the input data */
+        std::vector<std::complex<float>> tmp_out_vec;
+        bool ret = apply(tmp_in_vec, tmp_out_vec);
+
+        /* cast the filtered output back to int16_t */
+        for (auto out_iter = tmp_out_vec.begin(); out_iter != tmp_out_vec.end(); ++out_iter)
+        {
+            out.push_back((*out_iter).real());
+        }
+
+        return ret;
+    }
+
+    bool falcon_dsp_iir_filter::apply(std::vector<float>& in, std::vector<float>& out)
+    {
+        out.clear();
+        out.reserve(in.size());
+
+        /* create another copy of the data and cast to std::complex<float> */
+        std::vector<std::complex<float>> tmp_in_vec;
+        tmp_in_vec.reserve(in.size());
+        for (auto in_iter = in.begin(); in_iter != in.end(); ++in_iter)
+        {
+            tmp_in_vec.push_back(std::complex<float>((*in_iter), 0.0));
+        }
+
+        /* filter the input data */
+        std::vector<std::complex<float>> tmp_out_vec;
+        bool ret = apply(tmp_in_vec, tmp_out_vec);
+
+        /* cast the filtered output back to float */
+        for (auto out_iter = tmp_out_vec.begin(); out_iter != tmp_out_vec.end(); ++out_iter)
+        {
+            out.push_back((*out_iter).real());
+        }
+
+        return ret;
+    }
+
     bool falcon_dsp_iir_filter::apply(std::vector<std::complex<int16_t>>& in, std::vector<std::complex<int16_t>>& out)
     {
         out.clear();

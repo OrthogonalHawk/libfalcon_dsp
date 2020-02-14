@@ -177,7 +177,10 @@ namespace falcon_dsp
         virtual bool initialize(uint32_t up_rate, uint32_t down_rate,
                                 const std::vector<std::complex<float>>& filter_coeffs);
         void reset_state(void);
+
+        virtual int32_t apply(std::vector<float>& in, std::vector<float>& out);
         virtual int32_t apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out);
+
         uint32_t        needed_out_count(uint32_t inCount);
         uint32_t        coeffs_per_phase(void) { return m_params.coeffs_per_phase; }
 

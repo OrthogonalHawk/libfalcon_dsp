@@ -227,6 +227,32 @@ namespace falcon_dsp
         return need;
     }
     
+    int32_t falcon_dsp_polyphase_resampler::apply(std::vector<float>& in, std::vector<float>& out)
+    {
+        out.clear();
+        out.reserve(in.size());
+
+        /* create another copy of the data and cast to std::complex<float> */
+        std::vector<std::complex<float>> tmp_in_vec;
+        tmp_in_vec.reserve(in.size());
+        for (auto in_iter = in.begin(); in_iter != in.end(); ++in_iter)
+        {
+            tmp_in_vec.push_back(std::complex<float>((*in_iter), 0.0));
+        }
+
+        /* filter the input data */
+        std::vector<std::complex<float>> tmp_out_vec;
+        int32_t ret = apply(tmp_in_vec, tmp_out_vec);
+
+        /* cast the filtered output back to float */
+        for (auto out_iter = tmp_out_vec.begin(); out_iter != tmp_out_vec.end(); ++out_iter)
+        {
+            out.push_back((*out_iter).real());
+        }
+
+        return ret;
+    }
+
     int32_t falcon_dsp_polyphase_resampler::apply(std::vector<std::complex<float>>& in, std::vector<std::complex<float>>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
