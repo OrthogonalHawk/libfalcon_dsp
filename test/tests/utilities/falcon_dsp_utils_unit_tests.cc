@@ -390,3 +390,26 @@ TEST(falcon_dsp_utils, file_write_and_read_08)
         EXPECT_EQ(read_from_file[ii], data_to_write[ii]);
     }
 }
+
+TEST(falcon_dsp_utils, file_write_and_read_09)
+{
+    std::string TEST_FILE_NAME = "vectors/file_read_write_test_09.bin";
+    
+    std::vector<std::complex<float>> data_to_write;
+    for (int16_t ii = -128.0; ii < 128.0; ++ii)
+    {
+        data_to_write.push_back(std::complex<float>(ii + 0.5, ii - 0.5));
+    }
+    
+    EXPECT_TRUE(falcon_dsp::write_complex_data_to_file(TEST_FILE_NAME, falcon_dsp::file_type_e::BINARY, data_to_write));
+    
+    std::vector<std::complex<float>> read_from_file;
+    EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(TEST_FILE_NAME, falcon_dsp::file_type_e::BINARY, read_from_file));
+    
+    EXPECT_EQ(data_to_write.size(), read_from_file.size());
+    for (uint32_t ii = 0; ii < data_to_write.size() && ii < read_from_file.size(); ++ii)
+    {
+        ASSERT_EQ(read_from_file[ii].real(), data_to_write[ii].real()) << "Error at idx " << ii;
+        ASSERT_EQ(read_from_file[ii].imag(), data_to_write[ii].imag()) << "Error at idx " << ii;
+    }
+}

@@ -604,8 +604,28 @@ namespace falcon_dsp
         
         if (type == file_type_e::BINARY)
         {
-            /* currently not supported */
-            ret = false;
+            /* attempt to open the output file */
+            std::ofstream output_file(file_name, std::ios::out | std::ios::binary);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+
+            for (auto iter = data.begin(); iter != data.end(); ++iter)
+            {
+                float real = iter->real();
+                float imag = iter->imag();
+
+                output_file.write(reinterpret_cast<char *>(&real), sizeof(float));
+                output_file.write(reinterpret_cast<char *>(&imag), sizeof(float));
+
+                if (!output_file.good())
+                {
+                    return false;
+                }
+            }
+
+            output_file.close();
         }
         else if (type == file_type_e::ASCII)
         {
@@ -728,8 +748,41 @@ namespace falcon_dsp
         
         if (type == file_type_e::BINARY)
         {
-            std::cerr << "Reading BINARY files and returning complex floats is currently not supported" << std::endl;
-            ret = false;
+            /* attempt to open the input file */
+            std::ifstream input_file(file_name, std::ios::in | std::ios::binary);
+            if (!input_file.is_open())
+            {
+                std::cerr << "Unable to open BINARY input file " << file_name << std::endl;
+                return false;
+            }
+
+            /* get the file size in bytes */
+            input_file.seekg(0, std::ios::end);
+            auto file_size_in_bytes = input_file.tellg();
+            input_file.seekg(0, std::ios::beg);
+
+            uint32_t expected_number_of_samples = file_size_in_bytes / (sizeof(float) * 2);
+            for (uint32_t ii = 0; ii < expected_number_of_samples; ++ii)
+            {
+                char buf[sizeof(float) * 2];
+                input_file.read(buf, sizeof(float) * 2);
+
+                /* note that this code assumes that the binary file was written in a
+                 *  little endian format */
+                float real = *((float *)(&buf[0]));
+                float imag = *((float *)(&buf[sizeof(float)]));
+
+                data.push_back(std::complex<float>(real, imag));
+
+                if (!input_file.good())
+                {
+                    data.clear();
+                    
+                    std::cerr << "Reached unexpected EOF at sample index " << ii
+                              << " of " << expected_number_of_samples << std::endl;
+                    return false;
+                }
+            }
         }
         else if (type == file_type_e::ASCII)
         {
