@@ -54,11 +54,14 @@
 
 #include "signals/falcon_dsp_fm_demod.h"
 #include "transform/falcon_dsp_fir_filter.h"
+#include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
  *****************************************************************************/
+
+const bool TIMING_ENABLED = true;
 
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
@@ -218,20 +221,32 @@ namespace falcon_dsp
             return false;
         }
         
+        falcon_dsp_host_timer demod_timer("C++ FM Demod", TIMING_ENABLED);
+        
         std::vector<std::complex<float>> freq_shifted_data;
         ret &= m_freq_shifter.apply(in, freq_shifted_data);
+        
+        demod_timer.log_duration("Freq Shift"); demod_timer.reset();
         
         std::vector<std::complex<float>> resampled_at_200khz_data;
         ret &= m_signal_isolation_decimator.apply(freq_shifted_data, resampled_at_200khz_data) > 0;
         
+        demod_timer.log_duration("Isolate Signal"); demod_timer.reset();
+        
         std::vector<float> polar_discrim_out_data;
         ret &= m_polar_discriminator.apply(resampled_at_200khz_data, polar_discrim_out_data);
+        
+        demod_timer.log_duration("Polar Discriminate"); demod_timer.reset();
         
         std::vector<float> emphasis_filtered_data;
         ret &= m_deemphasis_filter.apply(polar_discrim_out_data, emphasis_filtered_data);
         
+        demod_timer.log_duration("Emphasis Filter"); demod_timer.reset();
+        
         std::vector<float> mono_audio_signal_data;
         ret &= m_mono_signal_decimator.apply(emphasis_filtered_data, mono_audio_signal_data) > 0;
+        
+        demod_timer.log_duration("Downsample to Audio Rate"); demod_timer.reset();
         
         float abs_max = 0.0;
         for (auto mono_iter = mono_audio_signal_data.begin();
@@ -249,6 +264,8 @@ namespace falcon_dsp
         {
             out.push_back((*mono_iter) * scale_val);
         }
+        
+        demod_timer.log_duration("Rescale"); demod_timer.reset();
         
         return ret && out.size() > 0;
     }
