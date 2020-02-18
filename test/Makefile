@@ -60,9 +60,11 @@ CC_SOURCES = \
     ../src/transform/falcon_dsp_multi_rate_channelizer.cc \
     ../src/transform/falcon_dsp_polar_discriminator.cc \
     ../src/transform/falcon_dsp_polyphase_resampler.cc \
+    ../src/transform/falcon_dsp_predefined_fir_filter.cc \
     ../src/transform/falcon_dsp_resample.cc \
     ../src/utilities/falcon_dsp_utils.cc \
     tests/math/falcon_dsp_math_cpp_unit_tests.cc \
+    tests/signals/falcon_dsp_fm_demod_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_freq_shift_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_fir_filter_cpp_unit_tests.cc \
     tests/transform/falcon_dsp_iir_filter_cpp_unit_tests.cc \

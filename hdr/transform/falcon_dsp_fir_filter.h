@@ -57,6 +57,8 @@
 #include <mutex>
 #include <vector>
 
+#include "transform/falcon_dsp_predefined_fir_filter.h"
+
 /******************************************************************************
  *                                 CONSTANTS
  *****************************************************************************/
@@ -92,6 +94,8 @@ namespace falcon_dsp
      *         during resampling operations.
      * @param[in] input_sample_rate     - input sample rate in samples per second
      * @param[in] output_sample_rate    - output sample rate in samples per second
+     * @param[in] taps                  - number of taps in the filter
+     * @param[in] source                - algorithm used to derive the coefficients
      * @param[out] up_rate              - upsample rate
      * @param[out] down_rate            - downsample rate
      * @param[out] coeffs               - filter coefficients
@@ -99,6 +103,7 @@ namespace falcon_dsp
      *          false otherwise.
      */
     bool get_resample_fir_params(uint32_t input_sample_rate, uint32_t output_sample_rate,
+                                 filter_taps_e taps, filter_source_type_e source,
                                  uint32_t& up_rate, uint32_t& down_rate,
                                  std::vector<std::complex<float>> &coeffs);
     

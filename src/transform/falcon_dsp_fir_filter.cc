@@ -52,7 +52,6 @@
 #include <stdint.h>
 
 #include "transform/falcon_dsp_fir_filter.h"
-#include "transform/falcon_dsp_predefined_fir_filter.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -101,6 +100,8 @@ namespace falcon_dsp
      *         during resampling operations.
      * @param[in] input_sample_rate     - input sample rate in samples per second
      * @param[in] output_sample_rate    - output sample rate in samples per second
+     * @param[in] taps                  - number of taps in the filter
+     * @param[in] source                - algorithm used to derive the coefficients
      * @param[out] up_rate              - upsample rate
      * @param[out] down_rate            - downsample rate
      * @param[out] coeffs               - filter coefficients
@@ -108,17 +109,18 @@ namespace falcon_dsp
      *          false otherwise.
      */
     bool get_resample_fir_params(uint32_t input_sample_rate, uint32_t output_sample_rate,
+                                 filter_taps_e taps, filter_source_type_e source,
                                  uint32_t& up_rate, uint32_t& down_rate,
                                  std::vector<std::complex<float>> &coeffs)
     {
         coeffs.clear();
 
-        auto rate_pair = std::make_pair(input_sample_rate, output_sample_rate);
-        if (s_predefined_resample_fir_coeffs.count(rate_pair) > 0)
+        auto filter_def = predefined_resample_filter_key_s(input_sample_rate, output_sample_rate, taps, source);
+        if (s_predefined_resample_fir_coeffs.count(filter_def) > 0)
         {
-            up_rate = s_predefined_resample_fir_coeffs[rate_pair].up_rate;
-            down_rate = s_predefined_resample_fir_coeffs[rate_pair].down_rate;
-            coeffs = s_predefined_resample_fir_coeffs[rate_pair].coeffs;
+            up_rate = s_predefined_resample_fir_coeffs[filter_def].up_rate;
+            down_rate = s_predefined_resample_fir_coeffs[filter_def].down_rate;
+            coeffs = s_predefined_resample_fir_coeffs[filter_def].coeffs;
             return true;
         }
         else
