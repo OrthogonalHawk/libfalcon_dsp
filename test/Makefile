@@ -80,6 +80,7 @@ CC_SOURCES = \
 ifneq (,$(filter $(CPU_ONLY),0))
     CUDA_SOURCES = \
         ../src/math/falcon_dsp_add_cuda.cu \
+        ../src/signals/falcon_dsp_fm_demod_cuda.cu \
         ../src/transform/falcon_dsp_fir_filter_cuda.cu \
         ../src/transform/falcon_dsp_freq_shift_cuda.cu \
         ../src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \
@@ -87,6 +88,7 @@ ifneq (,$(filter $(CPU_ONLY),0))
         ../src/transform/falcon_dsp_resample_cuda.cu \
         ../src/utilities/falcon_dsp_cuda_utils.cu \
         tests/math/falcon_dsp_math_cuda_unit_tests.cu \
+        tests/signals/falcon_dsp_fm_demod_cuda_unit_tests.cu \
         tests/transform/falcon_dsp_fir_filter_cuda_unit_tests.cu \
         tests/transform/falcon_dsp_freq_shift_cuda_unit_tests.cu \
         tests/transform/falcon_dsp_multi_rate_channelizer_cuda_unit_tests.cu \

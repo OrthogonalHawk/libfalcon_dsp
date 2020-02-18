@@ -57,6 +57,7 @@ CC_SOURCES = \
     src/transform/falcon_dsp_fir_filter.cc \
     src/transform/falcon_dsp_iir_filter.cc \
     src/transform/falcon_dsp_multi_rate_channelizer.cc \
+    src/transform/falcon_dsp_predefined_fir_filter.cc \
     src/transform/falcon_dsp_polar_discriminator.cc \
     src/transform/falcon_dsp_polyphase_resampler.cc \
     src/transform/falcon_dsp_resample.cc \
@@ -67,6 +68,7 @@ CC_SOURCES = \
 ifneq (,$(filter $(CPU_ONLY),0))
     CUDA_SOURCES = \
         src/math/falcon_dsp_add_cuda.cu \
+        src/signals/falcon_dsp_fm_demod_cuda.cu \
         src/transform/falcon_dsp_fir_filter_cuda.cu \
         src/transform/falcon_dsp_freq_shift_cuda.cu \
         src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \

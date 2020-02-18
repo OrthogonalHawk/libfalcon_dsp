@@ -25,12 +25,12 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_fm_demod.h
+ * @file     falcon_dsp_fm_demod_cuda.h
  * @author   OrthogonalHawk
- * @date     11-Feb-2020
+ * @date     18-Feb-2020
  *
  * @brief    Signal processing transformation functions for Frequency Modulation (FM)
- *            signal demodulation; C++ versions.
+ *            signal demodulation; CUDA version.
  *
  * @section  DESCRIPTION
  *
@@ -41,12 +41,12 @@
  *
  * @section  HISTORY
  *
- * 11-Feb-2020  OrthogonalHawk  Created file.
+ * 18-Feb-2020  OrthogonalHawk  Created file.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_SIGNALS_FM_DEMOD_H__
-#define __FALCON_DSP_SIGNALS_FM_DEMOD_H__
+#ifndef __FALCON_DSP_SIGNALS_FM_DEMOD_CUDA_H__
+#define __FALCON_DSP_SIGNALS_FM_DEMOD_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
@@ -56,7 +56,8 @@
 #include <mutex>
 #include <vector>
 
-#include "transform/falcon_dsp_freq_shift.h"
+#include "signals/falcon_dsp_fm_demod.h"
+#include "transform/falcon_dsp_multi_rate_channelizer_cuda.h"
 #include "transform/falcon_dsp_iir_filter.h"
 #include "transform/falcon_dsp_polar_discriminator.h"
 #include "transform/falcon_dsp_polyphase_resampler.h"
@@ -83,44 +84,31 @@ namespace falcon_dsp
      *                            CLASS DECLARATION
      *****************************************************************************/
     
-    /* @brief C++ implementation of an FM demodulator class.
+    /* @brief CUDA implementation of an FM demodulator class.
      * @description By implementing the FM demodulator as a class interface instead
      *               of a simple function the user is able to demodulate an arbitrarily
      *               long input.
      */
-    class falcon_dsp_fm_demodulator
+    class falcon_dsp_fm_demodulator_cuda : public falcon_dsp_fm_demodulator
     {
     public:
 
-        /* values from https://www.radiomuseum.org/forum/fm_pre_emphasis_and_de_emphasis.html */
-        static constexpr float AMERICAS_FM_DEEMPHASIS_TIME_CONSTANT = 75e-6;
-        static constexpr float EUROPE_ASIA_FM_DEEMPHASIS_TIME_CONSTANT = 50e-6;
+        falcon_dsp_fm_demodulator_cuda(void);
+        virtual ~falcon_dsp_fm_demodulator_cuda(void) = default;
 
-        static const uint32_t FM_RADIO_SAMPLE_RATE_IN_SPS = 228000;
-        static const uint32_t FM_RADIO_AUDIO_SAMPLE_RATE_IN_SPS = 45600;
-        
-        falcon_dsp_fm_demodulator(void);
-        virtual ~falcon_dsp_fm_demodulator(void) = default;
+        falcon_dsp_fm_demodulator_cuda(const falcon_dsp_fm_demodulator_cuda&) = delete;
 
-        falcon_dsp_fm_demodulator(const falcon_dsp_fm_demodulator&) = delete;
+        bool initialize(uint32_t input_sample_rate_in_sps,
+                        int32_t signal_offset_from_dc_in_hz,
+                        float deemphasis_time_constant_in_usecs = AMERICAS_FM_DEEMPHASIS_TIME_CONSTANT) override;
 
-        virtual bool initialize(uint32_t input_sample_rate_in_sps,
-                                int32_t signal_offset_from_dc_in_hz,
-                                float deemphasis_time_constant_in_usecs = AMERICAS_FM_DEEMPHASIS_TIME_CONSTANT);
-
-        virtual void reset_state(void);
-        virtual bool demod_mono(std::vector<std::complex<float>>& in, std::vector<int16_t>& out);
+        void reset_state(void) override;
+        virtual bool demod_mono(std::vector<std::complex<float>>& in, std::vector<int16_t>& out) override;
 
     protected:
-    
-        std::mutex                               m_mutex;
-        bool                                     m_initialized;
-        falcon_dsp_freq_shift                    m_freq_shifter;
-        falcon_dsp_polyphase_resampler           m_signal_isolation_decimator;
-        falcon_dsp_polar_discriminator           m_polar_discriminator;
-        falcon_dsp_iir_filter                    m_deemphasis_filter;
-        falcon_dsp_polyphase_resampler           m_mono_signal_decimator;
+
+        falcon_dsp_multi_rate_channelizer_cuda   m_shift_and_resample;
     };
 }
 
-#endif // __FALCON_DSP_SIGNALS_FM_DEMOD_H__
+#endif // __FALCON_DSP_SIGNALS_FM_DEMOD_CUDA_H__

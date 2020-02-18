@@ -25,11 +25,11 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_fm_demod.cc
+ * @file     falcon_dsp_fm_demod_cuda.cu
  * @author   OrthogonalHawk
- * @date     11-Feb-2020
+ * @date     18-Feb-2020
  *
- * @brief    Implements C++-based FM Demodulator.
+ * @brief    Implements CUDA-based FM Demodulator.
  *
  * @section  DESCRIPTION
  *
@@ -40,7 +40,7 @@
  *
  * @section  HISTORY
  *
- * 11-Feb-2020  OrthogonalHawk  Created file.
+ * 18-Feb-2020  OrthogonalHawk  Created file.
  *
  *****************************************************************************/
 
@@ -52,7 +52,7 @@
 #include <iostream>
 #include <stdint.h>
 
-#include "signals/falcon_dsp_fm_demod.h"
+#include "signals/falcon_dsp_fm_demod_cuda.h"
 #include "transform/falcon_dsp_fir_filter.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
@@ -85,19 +85,15 @@ namespace falcon_dsp
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    falcon_dsp_fm_demodulator::falcon_dsp_fm_demodulator(void)
-      : m_initialized(false),
-        m_freq_shifter(),
-        m_signal_isolation_decimator(),
-        m_polar_discriminator(),
-        m_deemphasis_filter(),
-        m_mono_signal_decimator()
+    falcon_dsp_fm_demodulator_cuda::falcon_dsp_fm_demodulator_cuda(void)
+      : falcon_dsp_fm_demodulator(),
+        m_shift_and_resample()
     { }
     
-    bool falcon_dsp_fm_demodulator::initialize(uint32_t input_sample_rate_in_sps,
-                                               int32_t signal_offset_from_dc_in_hz,
-                                               float deemphasis_time_constant_in_usecs)
-    {
+    bool falcon_dsp_fm_demodulator_cuda::initialize(uint32_t input_sample_rate_in_sps,
+                                                    int32_t signal_offset_from_dc_in_hz,
+                                                    float deemphasis_time_constant_in_usecs)
+    {        
         std::lock_guard<std::mutex> lock(m_mutex);
         
         if (m_initialized)
@@ -113,17 +109,10 @@ namespace falcon_dsp
             fprintf(stderr, "ERROR: Unsupported deemphasis time constant\n");
             return false;
         }
-            
-        m_initialized |= m_freq_shifter.initialize(input_sample_rate_in_sps, signal_offset_from_dc_in_hz);
-        if (!m_initialized)
-        {
-            fprintf(stderr, "ERROR: Failed to initialize frequency shift operation\n");
-            return false;
-        }
         
         uint32_t up_rate, down_rate;
         std::vector<std::complex<float>> coeffs;
-        m_initialized &= falcon_dsp::get_resample_fir_params(input_sample_rate_in_sps, FM_RADIO_SAMPLE_RATE_IN_SPS,
+        m_initialized |= falcon_dsp::get_resample_fir_params(input_sample_rate_in_sps, FM_RADIO_SAMPLE_RATE_IN_SPS,
                                                              filter_taps_e::FILTER_TAPS_64, filter_source_type_e::REMEZ,
                                                              up_rate, down_rate, coeffs);
         if (!m_initialized)
@@ -133,10 +122,19 @@ namespace falcon_dsp
             return false;
         }
         
-        m_initialized &= m_signal_isolation_decimator.initialize(up_rate, down_rate, coeffs);
+        std::vector<multi_rate_channelizer_channel_s> channels;
+        multi_rate_channelizer_channel_s fm_demod_channel;
+        fm_demod_channel.output_sample_rate_in_sps = FM_RADIO_SAMPLE_RATE_IN_SPS;
+        fm_demod_channel.freq_shift_in_hz = signal_offset_from_dc_in_hz;
+        fm_demod_channel.up_rate = up_rate;
+        fm_demod_channel.down_rate = down_rate;
+        fm_demod_channel.resample_filter_coeffs = coeffs;
+        channels.push_back(fm_demod_channel);
+        
+        m_initialized &= m_shift_and_resample.initialize(input_sample_rate_in_sps, channels);
         if (!m_initialized)
         {
-            fprintf(stderr, "ERROR: Failed to initialize FM signal isolation decimator\n");
+            fprintf(stderr, "ERROR: Failed to initialize multi-rate channelizer\n");
             return false;
         }
         
@@ -189,12 +187,12 @@ namespace falcon_dsp
             fprintf(stderr, "ERROR: Failed to initialize mono decimator\n");
             return false;
         }
-        
+
         /* initialization complete */
         return m_initialized;
     }
     
-    void falcon_dsp_fm_demodulator::reset_state(void)
+    void falcon_dsp_fm_demodulator_cuda::reset_state(void)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         
@@ -206,9 +204,10 @@ namespace falcon_dsp
         m_polar_discriminator.reset_state();
         m_deemphasis_filter.reset_state();
         m_mono_signal_decimator.reset_state();
+        m_shift_and_resample.reset_state();
     }
 
-    bool falcon_dsp_fm_demodulator::demod_mono(std::vector<std::complex<float>>& in, std::vector<int16_t>& out)
+    bool falcon_dsp_fm_demodulator_cuda::demod_mono(std::vector<std::complex<float>>& in, std::vector<int16_t>& out)
     {
         bool ret = true;
         
@@ -221,20 +220,15 @@ namespace falcon_dsp
             return false;
         }
         
-        falcon_dsp_host_timer demod_timer("C++ FM Demod", TIMING_ENABLED);
-        
-        std::vector<std::complex<float>> freq_shifted_data;
-        ret &= m_freq_shifter.apply(in, freq_shifted_data);
-        
-        demod_timer.log_duration("Freq Shift"); demod_timer.reset();
-        
-        std::vector<std::complex<float>> resampled_at_200khz_data;
-        ret &= m_signal_isolation_decimator.apply(freq_shifted_data, resampled_at_200khz_data) > 0;
+        falcon_dsp_host_timer demod_timer("CUDA FM Demod", TIMING_ENABLED);
+
+        std::vector<std::vector<std::complex<float>>> resampled_at_200khz_data;
+        ret &= m_shift_and_resample.apply(in, resampled_at_200khz_data) > 0;
         
         demod_timer.log_duration("Isolate Signal"); demod_timer.reset();
         
         std::vector<float> polar_discrim_out_data;
-        ret &= m_polar_discriminator.apply(resampled_at_200khz_data, polar_discrim_out_data);
+        ret &= m_polar_discriminator.apply(resampled_at_200khz_data[0], polar_discrim_out_data);
         
         demod_timer.log_duration("Polar Discriminate"); demod_timer.reset();
         
