@@ -48,6 +48,7 @@
  *                               INCLUDE_FILES
  *****************************************************************************/
 
+#include <algorithm>
 #include <iostream>
 #include <stdint.h>
 
@@ -120,6 +121,7 @@ namespace falcon_dsp
         uint32_t up_rate, down_rate;
         std::vector<std::complex<float>> coeffs;
         m_initialized &= falcon_dsp::get_resample_fir_params(input_sample_rate_in_sps, FM_RADIO_SAMPLE_RATE_IN_SPS,
+                                                             filter_taps_e::FILTER_TAPS_64, filter_source_type_e::REMEZ,
                                                              up_rate, down_rate, coeffs);
         if (!m_initialized)
         {
@@ -140,7 +142,7 @@ namespace falcon_dsp
         /* initialize the deemphasis filter based on the provided time constant. note that
          *  the following values assume a 200 kHz downsampled frequency and can be
          *  generated with the following Python code:
-         * >>> d = 2000000 * 75e-6
+         * >>> d = 200000 * 75e-6
          * >>> x = np.exp(-1/d)
          * >>> b, a = [1-x], [1,-x]
          */
@@ -148,15 +150,15 @@ namespace falcon_dsp
         std::vector<std::complex<float>> deemphasis_a_coeffs;
         if (deemphasis_time_constant_in_usecs == AMERICAS_FM_DEEMPHASIS_TIME_CONSTANT)
         {
-            deemphasis_b_coeffs.push_back(std::complex<float>(0.0066444937449655628, 0));
+            deemphasis_b_coeffs.push_back(std::complex<float>(0.064493014968382223, 0));
             deemphasis_a_coeffs.push_back(std::complex<float>(1.0, 0.0));
-            deemphasis_a_coeffs.push_back(std::complex<float>(-0.99335550625503444, 0.0));
+            deemphasis_a_coeffs.push_back(std::complex<float>(-0.93550698503161778, 0.0));
         }
         else
         {
-            deemphasis_b_coeffs.push_back(std::complex<float>(0.0099501662508318933, 0));
+            deemphasis_b_coeffs.push_back(std::complex<float>(0.095162581964040482, 0));
             deemphasis_a_coeffs.push_back(std::complex<float>(1.0, 0.0));
-            deemphasis_a_coeffs.push_back(std::complex<float>(-0.99004983374916811, 0.0));
+            deemphasis_a_coeffs.push_back(std::complex<float>(-0.90483741803595952, 0.0));
         }
 
         m_initialized &= m_deemphasis_filter.initialize(deemphasis_b_coeffs, deemphasis_a_coeffs);
@@ -169,6 +171,7 @@ namespace falcon_dsp
         uint32_t mono_up_rate, mono_down_rate;
         std::vector<std::complex<float>> mono_coeffs;
         m_initialized &= falcon_dsp::get_resample_fir_params(FM_RADIO_SAMPLE_RATE_IN_SPS, FM_RADIO_AUDIO_SAMPLE_RATE_IN_SPS,
+                                                             filter_taps_e::FILTER_TAPS_64, filter_source_type_e::REMEZ,
                                                              mono_up_rate, mono_down_rate, mono_coeffs);
         if (!m_initialized)
         {
@@ -204,6 +207,8 @@ namespace falcon_dsp
 
     bool falcon_dsp_fm_demodulator::demod_mono(std::vector<std::complex<float>>& in, std::vector<int16_t>& out)
     {
+        bool ret = true;
+        
         std::lock_guard<std::mutex> lock(m_mutex);
         
         out.clear();
@@ -214,28 +219,37 @@ namespace falcon_dsp
         }
         
         std::vector<std::complex<float>> freq_shifted_data;
-        m_freq_shifter.apply(in, freq_shifted_data);
+        ret &= m_freq_shifter.apply(in, freq_shifted_data);
         
         std::vector<std::complex<float>> resampled_at_200khz_data;
-        m_signal_isolation_decimator.apply(freq_shifted_data, resampled_at_200khz_data);
+        ret &= m_signal_isolation_decimator.apply(freq_shifted_data, resampled_at_200khz_data) > 0;
         
         std::vector<float> polar_discrim_out_data;
-        m_polar_discriminator.apply(resampled_at_200khz_data, polar_discrim_out_data);
+        ret &= m_polar_discriminator.apply(resampled_at_200khz_data, polar_discrim_out_data);
         
         std::vector<float> emphasis_filtered_data;
-        m_deemphasis_filter.apply(polar_discrim_out_data, emphasis_filtered_data);
+        ret &= m_deemphasis_filter.apply(polar_discrim_out_data, emphasis_filtered_data);
         
         std::vector<float> mono_audio_signal_data;
-        m_mono_signal_decimator.apply(emphasis_filtered_data, mono_audio_signal_data);
+        ret &= m_mono_signal_decimator.apply(emphasis_filtered_data, mono_audio_signal_data) > 0;
         
+        float abs_max = 0.0;
+        for (auto mono_iter = mono_audio_signal_data.begin();
+             mono_iter != mono_audio_signal_data.end();
+             ++mono_iter)
+        {
+            abs_max = std::max(std::abs(*mono_iter), abs_max);
+        }
+        
+        float scale_val = (10000.0 / abs_max);
         out.reserve(mono_audio_signal_data.size());
         for (auto mono_iter = mono_audio_signal_data.begin();
              mono_iter != mono_audio_signal_data.end();
              ++mono_iter)
         {
-            out.push_back(*mono_iter);
+            out.push_back((*mono_iter) * scale_val);
         }
         
-        return out.size() > 0;
+        return ret && out.size() > 0;
     }
 }
