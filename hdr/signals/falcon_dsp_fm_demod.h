@@ -96,8 +96,8 @@ namespace falcon_dsp
         static constexpr float AMERICAS_FM_DEEMPHASIS_TIME_CONSTANT = 75e-6;
         static constexpr float EUROPE_ASIA_FM_DEEMPHASIS_TIME_CONSTANT = 50e-6;
 
-        static const uint32_t FM_RADIO_SAMPLE_RATE_IN_SPS = 200000;
-        static const uint32_t FM_RADIO_AUDIO_SAMPLE_RATE_IN_SPS = 44000;
+        static const uint32_t FM_RADIO_SAMPLE_RATE_IN_SPS = 228000;
+        static const uint32_t FM_RADIO_AUDIO_SAMPLE_RATE_IN_SPS = 45600;
 
         falcon_dsp_fm_demodulator(void);
         virtual ~falcon_dsp_fm_demodulator(void) = default;
