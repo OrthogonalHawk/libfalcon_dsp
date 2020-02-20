@@ -363,7 +363,7 @@ namespace falcon_dsp
         /* copy output samples out of CUDA memory */
         cudaErrChkAssert(cudaMemcpy(static_cast<void *>(out.data()),
                                     static_cast<void *>(m_cuda_output_data),
-                                    in.size() * sizeof(std::complex<float>),
+                                    out.size() * sizeof(std::complex<float>),
                                     cudaMemcpyDeviceToHost));
 
         /* finished handling the current data; now update the state array */

@@ -81,14 +81,14 @@ namespace falcon_dsp
      * @return True if the output vector was populated with the discriminator output
      *          as requested; false otherwise.
      */
-    bool polar_discriminator(const std::vector<std::complex<int16_t>>& in,
+    bool polar_discriminator(std::vector<std::complex<int16_t>>& in,
                              std::vector<float>& out)
     {
         falcon_dsp_polar_discriminator discriminator;
         return discriminator.apply(in, out);
     }
 
-    bool polar_discriminator(const std::vector<std::complex<float>>& in,
+    bool polar_discriminator(std::vector<std::complex<float>>& in,
                              std::vector<float>& out)
     {
         falcon_dsp_polar_discriminator discriminator;
@@ -114,7 +114,7 @@ namespace falcon_dsp
         m_state.clear();
     }
 
-    bool falcon_dsp_polar_discriminator::apply(const std::vector<std::complex<int16_t>>& in, std::vector<float>& out)
+    bool falcon_dsp_polar_discriminator::apply(std::vector<std::complex<int16_t>>& in, std::vector<float>& out)
     {
         out.clear();
         out.reserve(in.size());
@@ -131,7 +131,7 @@ namespace falcon_dsp
         return apply(tmp_in_vec, out);
     }
     
-    bool falcon_dsp_polar_discriminator::apply(const std::vector<std::complex<float>>& in, std::vector<float>& out)
+    bool falcon_dsp_polar_discriminator::apply(std::vector<std::complex<float>>& in, std::vector<float>& out)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
         

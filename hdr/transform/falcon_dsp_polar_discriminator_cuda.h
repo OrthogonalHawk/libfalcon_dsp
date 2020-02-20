@@ -25,27 +25,26 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_polar_discriminator.h
+ * @file     falcon_dsp_polar_discriminator_cuda.h
  * @author   OrthogonalHawk
  * @date     21-Jan-2020
  *
  * @brief    Signal processing transformation functions for polar discrimination;
- *            C++ versions.
+ *            CUDA versions.
  *
  * @section  DESCRIPTION
  *
  * Defines a set of signal processing transformation polar discriminator functions.
- *  Includes C++ implementations.
+ *  Includes CUDA implementations.
  *
  * @section  HISTORY
  *
- * 21-Jan-2020  OrthogonalHawk  Created file.
- * 19-Feb-2020  OrthogonalHawk  Made more inheritance friendly.
+ * 19-Feb-2020  OrthogonalHawk  Created file.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_H__
-#define __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_H__
+#ifndef __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_CUDA_H__
+#define __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
@@ -54,6 +53,10 @@
 #include <complex>
 #include <mutex>
 #include <vector>
+
+#include <cuComplex.h>
+
+#include "transform/falcon_dsp_polar_discriminator.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -73,47 +76,55 @@ namespace falcon_dsp
      *                           FUNCTION DECLARATION
      *****************************************************************************/
  
-    /* @brief C++ implementation of a polar discriminator vector operation.
+    /* @brief CUDA implementation of a polar discriminator vector operation.
      * @param[in] in                    - input vector
      * @param[out] out                  - filtered vector
      * @return True if the output vector was populated with the discriminator output
      *          as requested; false otherwise.
      */
-    bool polar_discriminator(std::vector<std::complex<int16_t>>& in,
-                             std::vector<float>& out);
+    bool polar_discriminator_cuda(std::vector<std::complex<int16_t>>& in,
+                                  std::vector<float>& out);
     
-    bool polar_discriminator(std::vector<std::complex<float>>& in,
-                             std::vector<float>& out);
+    bool polar_discriminator_cuda(std::vector<std::complex<float>>& in,
+                                  std::vector<float>& out);
     
-    
+    /* CUDA kernel function that performs a polar discriminator operation */
+    __global__
+    void __polar_discriminator(cuFloatComplex * in_data,
+                               uint32_t in_data_len,
+                               float * out_data,
+                               uint32_t out_data_len);
+
     /******************************************************************************
      *                            CLASS DECLARATION
      *****************************************************************************/
     
-    /* @brief C++ implementation of a polar discriminator utility class.
+    /* @brief CUDA implementation of a polar discriminator utility class.
      * @description By implementing the polar discriminator utility as a class
      *               interface instead of a simple function the user is able
      *               to process an arbitrarily long input.
      */
-    class falcon_dsp_polar_discriminator
+    class falcon_dsp_polar_discriminator_cuda : public falcon_dsp_polar_discriminator
     {
     public:
 
-        falcon_dsp_polar_discriminator(void);
-        virtual ~falcon_dsp_polar_discriminator(void) = default;
+        falcon_dsp_polar_discriminator_cuda(void);
+        ~falcon_dsp_polar_discriminator_cuda(void);
 
-        falcon_dsp_polar_discriminator(const falcon_dsp_polar_discriminator&) = delete;
+        falcon_dsp_polar_discriminator_cuda(const falcon_dsp_polar_discriminator_cuda&) = delete;
 
-        void reset_state(void);
+        virtual void reset_state(void);
         virtual bool apply(std::vector<std::complex<int16_t>>& in, std::vector<float>& out);
         virtual bool apply(std::vector<std::complex<float>>& in, std::vector<float>& out);
-
+    
     protected:
     
-        std::mutex                               m_mutex;
-        bool                                     m_initialized;
-        std::vector<std::complex<float>>         m_state;
+        cuFloatComplex *                 m_input_data;
+        uint32_t                         m_input_data_len;
+        
+        float *                          m_output_data;
+        uint32_t                         m_output_data_len;
     };
 }
 
-#endif // __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_H__
+#endif // __FALCON_DSP_TRANSFORM_POLAR_DISCRIMINATOR_CUDA_H__
