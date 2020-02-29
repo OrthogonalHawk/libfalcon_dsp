@@ -25,40 +25,33 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_multi_rate_channelizer.h
+ * @file     falcon_dsp_stream.h
  * @author   OrthogonalHawk
- * @date     29-Jan-2020
+ * @date     22-Feb-2020
  *
- * @brief    Signal processing transformation class and functions to implement
- *            a multi-rate channelizer in C++.
+ * @brief    Base class for FALCON DSP library streams.
  *
  * @section  DESCRIPTION
  *
- * Defines a set of signal processing transformation functions and classes that
- *  together implement a multi-rate channelizer and filtering capability.
- *  Implementation uses C++.
+ * Defines a base class for FALCON DSP library streams. Streams are a construct
+ *  used to manage a chain of related signal processing operations, particularly
+ *  when using those operations together is tied to GPU hardware and memory
+ *  management.
  *
  * @section  HISTORY
  *
- * 29-Jan-2020  OrthogonalHawk  File created.
+ * 22-Feb-2020  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
-#define __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
+#ifndef __FALCON_DSP_STREAM_H__
+#define __FALCON_DSP_STREAM_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
  *****************************************************************************/
 
-#include <complex>
-#include <memory>
 #include <mutex>
-#include <vector>
-
-#include "transform/falcon_dsp_freq_shift.h"
-#include "transform/falcon_dsp_polyphase_resampler.h"
-#include "transform/stream/falcon_dsp_channelizer_stream.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -86,44 +79,21 @@ namespace falcon_dsp
      * @description Builds on several separate C++ implementations from the FALCON
      *               DSP library.
      */
-    class falcon_dsp_multi_rate_channelizer
+    class falcon_dsp_stream
     {
     public:
         
-        falcon_dsp_multi_rate_channelizer(void);
-        ~falcon_dsp_multi_rate_channelizer(void);
+        falcon_dsp_stream(void) = default;
+        virtual ~falcon_dsp_stream(void) = default;
         
-        falcon_dsp_multi_rate_channelizer(const falcon_dsp_multi_rate_channelizer&) = delete;
+        falcon_dsp_stream(const falcon_dsp_stream&) = default;
         
-        bool initialize(uint32_t input_sample_rate, std::vector<falcon_dsp_channelizer_stream> channels);
+        virtual bool initialize(void);
 
-        bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
+    protected:
 
-        void reset_state(void);
-
-    private:
-
-        /* define an internal, class-only structure so that we can add more information */
-        struct internal_multi_rate_cpp_channelizer_channel_s : falcon_dsp_channelizer_stream
-        {
-            internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate,
-                                                          const falcon_dsp_channelizer_stream& other);            
-            ~internal_multi_rate_cpp_channelizer_channel_s(void);
-            
-            falcon_dsp_freq_shift                             freq_shifter;
-            falcon_dsp_polyphase_resampler                    resampler;
-            
-        private:
-        
-            internal_multi_rate_cpp_channelizer_channel_s(void) = delete;
-        };
-
-        std::mutex                                            m_mutex;
-        bool                                                  m_initialized;
-        
-        /* variables for multi-channel management */
-        std::vector<std::unique_ptr<internal_multi_rate_cpp_channelizer_channel_s>> m_cpp_channels;
+        std::recursive_mutex                m_mutex;
     };
 }
 
-#endif // __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
+#endif // __FALCON_DSP_STREAM_H__

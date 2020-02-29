@@ -111,7 +111,7 @@ namespace falcon_dsp
      *                            CLASS IMPLEMENTATION
      *****************************************************************************/
     
-    void polyphase_resampler_params_s::initialize(uint32_t in_up_rate, uint32_t in_down_rate,
+    bool polyphase_resampler_params_s::initialize(uint32_t in_up_rate, uint32_t in_down_rate,
                                                   const std::vector<std::complex<float>>& filter_coeffs)
     {
         up_rate = in_up_rate;
@@ -119,6 +119,11 @@ namespace falcon_dsp
         padded_coeff_count = filter_coeffs.size();
         coeff_phase = 0;
         xOffset = 0;
+
+        if (filter_coeffs.size() == 0)
+        {
+            return false;
+        }
         
         /* The coefficients are copied into local storage in a transposed, flipped
          *  arrangement.  For example, suppose up_rate is 3, and the input number
@@ -135,11 +140,7 @@ namespace falcon_dsp
         coeffs_per_phase = padded_coeff_count / up_rate;
     
         transposed_coeffs.clear();
-        transposed_coeffs.reserve(padded_coeff_count);
-        for (uint32_t ii = 0; ii < padded_coeff_count; ++ii)
-        {
-            transposed_coeffs.push_back(0);
-        }
+        transposed_coeffs.resize(padded_coeff_count, std::complex<float>(0.0, 0.0));
 
         /* This both transposes, and "flips" each phase, while
          * copying the defined coefficients into local storage.
@@ -159,6 +160,8 @@ namespace falcon_dsp
         /* maximum state size is now known; initialize the state buffer */
         state.clear();
         state.resize(coeffs_per_phase - 1, std::complex<float>(0.0, 0.0));
+        
+        return true;
     }
         
     void polyphase_resampler_params_s::reset_state(void)
@@ -183,13 +186,12 @@ namespace falcon_dsp
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         
-        if (m_initialized)
+        if (m_initialized || filter_coeffs.size() == 0)
         {
             return false;
         }
-        
-        m_params.initialize(up_rate, down_rate, filter_coeffs);
-        m_initialized = true;
+
+        m_initialized = m_params.initialize(up_rate, down_rate, filter_coeffs);
         
         return m_initialized;
     }
@@ -313,7 +315,7 @@ namespace falcon_dsp
 
         // manage _state buffer
         _manage_state(in);
-        
+
         // number of samples computed
         return out.size();
     }

@@ -104,7 +104,7 @@ namespace falcon_dsp
     private:
 
         /* define an internal, class-only structure so that we can add more information */
-        struct internal_multi_rate_cpp_channelizer_channel_s : falcon_dsp_channelizer_stream
+        struct internal_multi_rate_cpp_channelizer_channel_s : public falcon_dsp_channelizer_stream
         {
             internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate,
                                                           const falcon_dsp_channelizer_stream& other);            
@@ -112,7 +112,7 @@ namespace falcon_dsp
             
             falcon_dsp_freq_shift                             freq_shifter;
             falcon_dsp_polyphase_resampler                    resampler;
-            
+
         private:
         
             internal_multi_rate_cpp_channelizer_channel_s(void) = delete;

@@ -145,7 +145,7 @@ namespace falcon_dsp
  
     struct polyphase_resampler_params_s
     {
-        void initialize(uint32_t in_up_rate, uint32_t in_down_rate,
+        bool initialize(uint32_t in_up_rate, uint32_t in_down_rate,
                         const std::vector<std::complex<float>>& filter_coeffs);
     
         void reset_state(void);

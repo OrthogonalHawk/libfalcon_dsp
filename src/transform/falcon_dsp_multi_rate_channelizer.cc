@@ -53,6 +53,7 @@
 #include <stdint.h>
 
 #include "transform/falcon_dsp_multi_rate_channelizer.h"
+#include "transform/stream/falcon_dsp_channelizer_stream.h"
 #include "utilities/falcon_dsp_host_timer.h"
 
 /******************************************************************************
@@ -78,18 +79,19 @@ namespace falcon_dsp
     /******************************************************************************
      *                           CLASS IMPLEMENTATION
      *****************************************************************************/    
-    falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate, const multi_rate_channelizer_channel_s& other)
+    falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate, const falcon_dsp_channelizer_stream& other)
       : freq_shifter(),
         resampler()
     {
-        output_sample_rate_in_sps = other.output_sample_rate_in_sps;
-        freq_shift_in_hz = other.freq_shift_in_hz;
-        up_rate = other.up_rate;
-        down_rate = other.down_rate;
-        resample_filter_coeffs = other.resample_filter_coeffs;
-          
-        freq_shifter.initialize(input_sample_rate, other.freq_shift_in_hz);
-        resampler.initialize(other.up_rate, other.down_rate, other.resample_filter_coeffs);
+        auto resample_coeffs = other.get_resample_coeffs();
+        initialize(other.get_output_sample_rate_in_sps(),
+                   other.get_freq_shift_in_hz(),
+                   other.get_up_rate(),
+                   other.get_down_rate(),
+                   resample_coeffs);
+
+        freq_shifter.initialize(input_sample_rate, get_freq_shift_in_hz());
+        resampler.initialize(get_up_rate(), get_down_rate(), get_resample_coeffs());
     }
             
     falcon_dsp_multi_rate_channelizer::internal_multi_rate_cpp_channelizer_channel_s::~internal_multi_rate_cpp_channelizer_channel_s(void)
@@ -107,7 +109,7 @@ namespace falcon_dsp
     }
     
     bool falcon_dsp_multi_rate_channelizer::initialize(uint32_t input_sample_rate,
-                                                       std::vector<multi_rate_channelizer_channel_s> channels)
+                                                       std::vector<falcon_dsp_channelizer_stream> channels)
     {
         std::lock_guard<std::mutex> lock(std::mutex);
 
@@ -156,7 +158,7 @@ namespace falcon_dsp
         {
             m_cpp_channels[out_chan_idx]->freq_shifter.apply(in, freq_shifted_output);
             m_cpp_channels[out_chan_idx]->resampler.apply(freq_shifted_output, resampled_output);
-            
+
             out.push_back(resampled_output);
         }
 

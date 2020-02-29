@@ -25,39 +25,27 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_multi_rate_channelizer.h
+ * @file     falcon_dsp_channelizer_stream.cc
  * @author   OrthogonalHawk
- * @date     29-Jan-2020
+ * @date     22-Feb-2020
  *
- * @brief    Signal processing transformation class and functions to implement
- *            a multi-rate channelizer in C++.
+ * @brief    Implements the FALCON DSP channelizer stream class.
  *
  * @section  DESCRIPTION
  *
- * Defines a set of signal processing transformation functions and classes that
- *  together implement a multi-rate channelizer and filtering capability.
- *  Implementation uses C++.
+ * Implements the FALCON DSP channelizer stream class, which is used for the
+ *  multi-rate channelizer.
  *
  * @section  HISTORY
  *
- * 29-Jan-2020  OrthogonalHawk  File created.
+ * 22-Feb-2020  OrthogonalHawk  File created.
  *
  *****************************************************************************/
-
-#ifndef __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
-#define __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
  *****************************************************************************/
 
-#include <complex>
-#include <memory>
-#include <mutex>
-#include <vector>
-
-#include "transform/falcon_dsp_freq_shift.h"
-#include "transform/falcon_dsp_polyphase_resampler.h"
 #include "transform/stream/falcon_dsp_channelizer_stream.h"
 
 /******************************************************************************
@@ -75,55 +63,52 @@
 namespace falcon_dsp
 {
     /******************************************************************************
-     *                           FUNCTION DECLARATION
-     *****************************************************************************/    
-    
-    /******************************************************************************
-     *                            CLASS DECLARATION
+     *                        FUNCTION IMPLEMENTATION
      *****************************************************************************/
     
-    /* @brief C++ implementation of a multi-rate channelizer class.
-     * @description Builds on several separate C++ implementations from the FALCON
-     *               DSP library.
-     */
-    class falcon_dsp_multi_rate_channelizer
+    /******************************************************************************
+     *                           CLASS IMPLEMENTATION
+     *****************************************************************************/
+    
+    falcon_dsp_channelizer_stream::falcon_dsp_channelizer_stream(void)
+      : falcon_dsp_stream(),
+        m_output_sample_rate_in_sps(0),
+        m_freq_shift_in_hz(0),
+        m_up_rate(1),
+        m_down_rate(1)
+    { }
+
+    falcon_dsp_channelizer_stream::falcon_dsp_channelizer_stream(const falcon_dsp_channelizer_stream& other)
+      : falcon_dsp_stream()
     {
-    public:
+        m_output_sample_rate_in_sps = other.m_output_sample_rate_in_sps;
+        m_freq_shift_in_hz = other.m_freq_shift_in_hz;
+        m_up_rate = other.m_up_rate;
+        m_down_rate = other.m_down_rate;
+        m_resample_filter_coeffs = other.m_resample_filter_coeffs;
+    }
+
+    bool falcon_dsp_channelizer_stream::initialize(uint32_t out_sample_rate_in_sps,
+                                                   int64_t  freq_shift_in_hz,
+                                                   uint32_t up_rate,
+                                                   uint32_t down_rate,
+                                                   std::vector<std::complex<float>>& resample_coeffs)
+    {
+        m_mutex.lock();
+     
+        bool ret = falcon_dsp_stream::initialize();
         
-        falcon_dsp_multi_rate_channelizer(void);
-        ~falcon_dsp_multi_rate_channelizer(void);
-        
-        falcon_dsp_multi_rate_channelizer(const falcon_dsp_multi_rate_channelizer&) = delete;
-        
-        bool initialize(uint32_t input_sample_rate, std::vector<falcon_dsp_channelizer_stream> channels);
-
-        bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
-
-        void reset_state(void);
-
-    private:
-
-        /* define an internal, class-only structure so that we can add more information */
-        struct internal_multi_rate_cpp_channelizer_channel_s : falcon_dsp_channelizer_stream
+        if (ret)
         {
-            internal_multi_rate_cpp_channelizer_channel_s(uint32_t input_sample_rate,
-                                                          const falcon_dsp_channelizer_stream& other);            
-            ~internal_multi_rate_cpp_channelizer_channel_s(void);
-            
-            falcon_dsp_freq_shift                             freq_shifter;
-            falcon_dsp_polyphase_resampler                    resampler;
-            
-        private:
+            m_output_sample_rate_in_sps = out_sample_rate_in_sps;
+            m_freq_shift_in_hz = freq_shift_in_hz;
+            m_up_rate = up_rate;
+            m_down_rate = down_rate;
+            m_resample_filter_coeffs = resample_coeffs;
+        }
         
-            internal_multi_rate_cpp_channelizer_channel_s(void) = delete;
-        };
-
-        std::mutex                                            m_mutex;
-        bool                                                  m_initialized;
+        m_mutex.unlock();
         
-        /* variables for multi-channel management */
-        std::vector<std::unique_ptr<internal_multi_rate_cpp_channelizer_channel_s>> m_cpp_channels;
-    };
+        return ret;
+    }
 }
-
-#endif // __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_H__
