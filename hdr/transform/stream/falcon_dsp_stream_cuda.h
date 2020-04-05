@@ -25,33 +25,33 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_stream.h
+ * @file     falcon_dsp_stream_cuda.h
  * @author   OrthogonalHawk
- * @date     22-Feb-2020
+ * @date     01-Mar-2020
  *
- * @brief    Base class for FALCON DSP library streams.
+ * @brief    Base class for FALCON DSP library CUDA streams.
  *
  * @section  DESCRIPTION
  *
- * Defines a base class for FALCON DSP library streams. Streams are a construct
+ * Defines a base class for FALCON DSP library CUDA streams. Streams are a construct
  *  used to manage a chain of related signal processing operations, particularly
  *  when using those operations together is tied to GPU hardware and memory
  *  management.
  *
  * @section  HISTORY
  *
- * 22-Feb-2020  OrthogonalHawk  File created.
+ * 01-Mar-2020  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_STREAM_H__
-#define __FALCON_DSP_STREAM_H__
+#ifndef __FALCON_DSP_STREAM_CUDA_H__
+#define __FALCON_DSP_STREAM_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
  *****************************************************************************/
 
-#include <mutex>
+#include "transform/stream/falcon_dsp_stream.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -75,26 +75,32 @@ namespace falcon_dsp
      *                            CLASS DECLARATION
      *****************************************************************************/
     
-    /* @brief C++ implementation of a multi-rate channelizer class.
-     * @description Builds on several separate C++ implementations from the FALCON
-     *               DSP library.
+    /* @brief Base CUDA stream class
+     * @description Builds on the C++ base stream class and adds CUDA-specific methods.
      */
-    class falcon_dsp_stream
+    class falcon_dsp_stream_cuda : public falcon_dsp_stream
     {
     public:
         
-        falcon_dsp_stream(void) = default;
-        virtual ~falcon_dsp_stream(void) = default;
+        falcon_dsp_stream_cuda(void);
+        ~falcon_dsp_stream_cuda(void) = default;
+
+        falcon_dsp_stream_cuda(const falcon_dsp_stream_cuda&) = default;
         
-        falcon_dsp_stream(const falcon_dsp_stream&) = default;
-        
-        virtual bool initialize(void);
-        virtual bool reset_state(void);
+        bool initialize(void) override;
+        virtual bool allocate_memory(uint32_t input_vector_len);
+        virtual bool manage_state(uint32_t input_vector_len);
+        bool reset_state(void);
+
+        uint32_t get_max_num_cuda_threads(void) const { return m_max_num_cuda_threads; }
+        bool set_max_num_cuda_threads(uint32_t max_num_cuda_threads);
 
     protected:
 
-        std::recursive_mutex                m_mutex;
+        virtual bool cleanup_memory(void);
+
+        uint32_t                      m_max_num_cuda_threads;
     };
 }
 
-#endif // __FALCON_DSP_STREAM_H__
+#endif // __FALCON_DSP_STREAM_CUDA_H__

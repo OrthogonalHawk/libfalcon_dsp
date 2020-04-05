@@ -75,4 +75,10 @@ namespace falcon_dsp
         /* no action required to initialize this class */
         return true;
     }
+    
+    bool falcon_dsp_stream::reset_state(void)
+    {
+        /* no action required in the base class */
+        return true;
+    }
 }

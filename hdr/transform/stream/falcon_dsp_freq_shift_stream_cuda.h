@@ -25,43 +25,38 @@
 
 /******************************************************************************
  *
- * @file     falcon_dsp_multi_rate_channelizer_cuda.h
+ * @file     falcon_dsp_channelizer_stream_cuda.h
  * @author   OrthogonalHawk
- * @date     28-Jan-2020
+ * @date     22-Feb-2020
  *
- * @brief    Signal processing transformation class and functions to implement
- *            a multi-rate channelizer in CUDA.
+ * @brief    Signal processing channelizer stream class for CUDA. Helps to
+ *            manage state and memory information associated with a particular
+ *            channelizer output data stream.
  *
  * @section  DESCRIPTION
  *
- * Defines a set of signal processing transformation functions and classes that
- *  together implement a multi-rate channelizer and filtering capability.
- *  Implementation uses CUDA to leverage GPU acceleration.
+ * Defines a signal processing channelizer stream class which helps to manage
+ *  state and memory information.
  *
  * @section  HISTORY
  *
- * 28-Jan-2020  OrthogonalHawk  File created.
+ * 22-Feb-2020  OrthogonalHawk  File created.
  *
  *****************************************************************************/
 
-#ifndef __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_CUDA_H__
-#define __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_CUDA_H__
+#ifndef __FALCON_DSP_FREQ_SHIFT_STREAM_CUDA_H__
+#define __FALCON_DSP_FREQ_SHIFT_STREAM_CUDA_H__
 
 /******************************************************************************
  *                               INCLUDE_FILES
  *****************************************************************************/
 
 #include <complex>
-#include <memory>
-#include <mutex>
+#include <cuComplex.h>
+#include <stdint.h>
 #include <vector>
 
-#include <cuComplex.h>
-
-#include "transform/falcon_dsp_freq_shift_cuda.h"
-#include "transform/falcon_dsp_polyphase_resampler_cuda.h"
-#include "transform/stream/falcon_dsp_channelizer_stream_cuda.h"
-#include "utilities/falcon_dsp_cuda_utils.h"
+#include "transform/stream/falcon_dsp_stream_cuda.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -70,15 +65,6 @@
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
-
-struct multi_rate_channelizer_channel_s
-{
-    uint32_t                             output_sample_rate_in_sps;
-    int64_t                              freq_shift_in_hz;
-    uint32_t                             up_rate;
-    uint32_t                             down_rate;
-    std::vector<std::complex<float>>     resample_filter_coeffs;
-};
 
 /******************************************************************************
  *                                  MACROS
@@ -94,42 +80,54 @@ namespace falcon_dsp
      *                            CLASS DECLARATION
      *****************************************************************************/
     
-    /* @brief CUDA implementation of a multi-rate channelizer class.
-     * @description Builds on several separate CUDA implementations from the FALCON
-     *               DSP library but brings them together in an optimized way where
-     *               data is copied to the GPU once and then processed on-device to
-     *               minimize expensive host <-> device memory transfers.
+    struct falcon_dsp_freq_shift_params_cuda_s
+    {
+        uint64_t                num_samples_handled;
+        uint32_t                time_shift_rollover_sample_idx;
+        double                  angular_freq;
+        cuFloatComplex *        out_data;
+        uint32_t                out_data_len;
+    };
+
+    /* @brief Implementation of a channelizer stream class for CUDA applications.
+     * @description Implements the basic channelizer stream class, such as might be
+     *               used in a multi-rate channelizer.
      */
-    class falcon_dsp_multi_rate_channelizer_cuda
+    class falcon_dsp_freq_shift_stream_cuda : public falcon_dsp_stream_cuda
     {
     public:
-        
-        falcon_dsp_multi_rate_channelizer_cuda(void);
-        ~falcon_dsp_multi_rate_channelizer_cuda(void);
-        
-        falcon_dsp_multi_rate_channelizer_cuda(const falcon_dsp_multi_rate_channelizer_cuda&) = delete;
-        
-        bool initialize(uint32_t input_sample_rate, std::vector<multi_rate_channelizer_channel_s> channels);
 
-        bool apply(std::vector<std::complex<float>>& in, std::vector<std::vector<std::complex<float>>>& out);
+        falcon_dsp_freq_shift_stream_cuda(void);
+        ~falcon_dsp_freq_shift_stream_cuda(void);
+        falcon_dsp_freq_shift_stream_cuda(const falcon_dsp_freq_shift_stream_cuda&) = delete;
+        
+        bool initialize(void) override { return false; }
+        bool initialize(uint32_t rollover_sample_idx, double angular_freq);
+        bool allocate_memory(uint32_t input_vector_len) override;
+        bool manage_state(uint32_t input_vector_len) override;
+        bool reset_state(void) override;
 
-        void reset_state(void);
+        falcon_dsp_freq_shift_params_cuda_s get_freq_shift_params(void);
+        cuFloatComplex * get_freq_shift_out_data_ptr(bool adjust_for_prefix = false) const;
+        uint32_t get_freq_shift_out_data_len(bool adjust_for_prefix = false) const;
+
+        void add_freq_shift_samples_handled(uint32_t num_samples_handled);
+
+    protected:
+
+        bool allocate_memory(uint32_t input_vector_len, uint32_t extra_output_sample_prefix);
+
+        bool cleanup_memory(void) override;
 
     private:
-    
-        void _manage_resampler_state(uint32_t chan_idx, uint32_t input_vector_len);
 
-        std::mutex                                            m_mutex;
-        bool                                                  m_initialized;
-        
-        /* variables for input data memory management */
-        cuFloatComplex *                                      m_input_data;
-        uint32_t                                              m_input_data_len;
-        
-        /* variables for multi-channel management */
-        std::vector<std::unique_ptr<falcon_dsp_channelizer_stream_cuda>>  m_channels;
-        falcon_dsp_freq_shift_params_cuda_s *                             d_freq_shift_channels;
+        uint64_t                m_num_freq_shift_samples_handled;
+        uint32_t                m_time_shift_rollover_sample_idx;
+        double                  m_angular_freq;
+        cuFloatComplex *        m_freq_shift_out_data;
+        uint32_t                m_freq_shift_out_data_len;
+        uint32_t                m_freq_shift_out_data_prefix_len;
     };
 }
 
-#endif // __FALCON_DSP_TRANSFORM_MULTI_RATE_CHANNELIZER_CUDA_H__
+#endif // __FALCON_DSP_FREQ_SHIFT_STREAM_CUDA_H__

@@ -71,6 +71,7 @@ ifneq (,$(filter $(CPU_ONLY),0))
     CUDA_SOURCES = \
         src/math/falcon_dsp_add_cuda.cu \
         src/signals/falcon_dsp_fm_demod_cuda.cu \
+        src/transform/stream/falcon_dsp_freq_shift_stream_cuda.cu \
         src/transform/falcon_dsp_fir_filter_cuda.cu \
         src/transform/falcon_dsp_freq_shift_cuda.cu \
         src/transform/falcon_dsp_multi_rate_channelizer_cuda.cu \

@@ -59,6 +59,7 @@
 #include <cuComplex.h>
 
 #include "transform/falcon_dsp_freq_shift.h"
+#include "transform/stream/falcon_dsp_freq_shift_stream_cuda.h"
 #include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************
@@ -68,57 +69,6 @@
 /******************************************************************************
  *                              ENUMS & TYPEDEFS
  *****************************************************************************/
-
-struct freq_shift_channel_s
-{
-    freq_shift_channel_s(void)
-      : num_samples_handled(0),
-        time_shift_rollover_sample_idx(1e6),
-        angular_freq(0.0),
-        out_data(nullptr),
-        out_data_len(0)
-    { }
-
-    ~freq_shift_channel_s(void)
-    {
-        cleanup_memory();
-    }
-
-    void allocate_memory(uint32_t input_vector_len)
-    {
-        if (out_data)
-        {
-            cudaErrChk(cudaFree(out_data));
-            out_data = nullptr;
-            out_data_len = 0;
-        }
-
-        cudaErrChkAssert(cudaMallocManaged(&out_data,
-                                           input_vector_len * sizeof(std::complex<float>)));
-        out_data_len = input_vector_len;
-    }
-
-    void cleanup_memory(void)
-    {
-        if (out_data)
-        {
-            cudaErrChk(cudaFree(out_data));
-            out_data = nullptr;
-            out_data_len = 0;
-        }
-    }
-
-    void reset_state(void)
-    {
-        num_samples_handled = 0;
-    }
-
-    uint64_t num_samples_handled;
-    uint32_t time_shift_rollover_sample_idx;
-    double angular_freq;
-    cuFloatComplex * out_data;
-    uint32_t out_data_len;
-};
 
 /******************************************************************************
  *                                  MACROS
@@ -169,7 +119,7 @@ namespace falcon_dsp
     
     /* CUDA kernel function that supports multi-channel frequency shifting. */
     __global__
-    void __freq_shift_multi_chan(freq_shift_channel_s * channels,
+    void __freq_shift_multi_chan(falcon_dsp_freq_shift_params_cuda_s * channels,
                                  uint32_t num_channels,
                                  cuFloatComplex * in_data,
                                  uint32_t in_data_len);
@@ -203,12 +153,12 @@ namespace falcon_dsp
     private:
 
         /* variables for input data memory management */
-        void *                                                m_cuda_input_data;
-        uint32_t                                              m_max_num_input_samples;
+        void *                                                              m_cuda_input_data;
+        uint32_t                                                            m_max_num_input_samples;
         
         /* variables for multi-channel management */
-        std::vector<std::unique_ptr<freq_shift_channel_s>>    m_freq_shift_channels;
-        freq_shift_channel_s *                                d_freq_shift_channels;
+        std::vector<std::unique_ptr<falcon_dsp_freq_shift_stream_cuda>>     m_freq_shift_streams;
+        falcon_dsp_freq_shift_params_cuda_s *                               m_freq_shift_params;
     };
 }
 

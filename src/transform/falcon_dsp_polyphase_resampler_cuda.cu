@@ -225,7 +225,7 @@ namespace falcon_dsp
              x_idx < (thread_data_stop_idx + 1) &&
                  x_idx < in_len;
              ++x_idx)
-        {   
+        {
             out_sample.acc = cuCaddf(out_sample.acc,
                                      cuCmulf(in[x_idx], *(out_sample.coeff_ptr++)));
         }
