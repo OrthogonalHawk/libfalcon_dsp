@@ -260,11 +260,9 @@ namespace falcon_dsp
         }
         else
         {
-            cuFloatComplex * copy_start_idx = get_freq_shift_out_data_ptr() + 
-                                              get_freq_shift_out_data_len() -
+            cuFloatComplex * copy_start_idx = get_freq_shift_out_data_ptr(false) + 
+                                              get_freq_shift_out_data_len(false) -
                                               m_resampler_params.state.size();
-                                                  
-            copy_start_idx = get_freq_shift_out_data_ptr();
                 
             /* just copy last input samples into state buffer */
             cudaErrChkAssert(cudaMemcpy(m_resampler_params.state.data(),

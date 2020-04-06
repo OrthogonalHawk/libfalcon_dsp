@@ -53,6 +53,7 @@
 #include <gtest/gtest.h>
 
 #include "transform/falcon_dsp_multi_rate_channelizer.h"
+#include "transform/stream/falcon_dsp_channelizer_stream.h"
 #include "utilities/falcon_dsp_host_timer.h"
 #include "utilities/falcon_dsp_utils.h"
 
@@ -129,7 +130,7 @@ void run_cpp_multi_rate_channelizer_test(std::string input_file_name,
     
     /* read in the coefficient files and create the multi-rate channelizer
      *  configuration vector */
-    std::vector<multi_rate_channelizer_channel_s> channels;
+    std::vector<falcon_dsp::falcon_dsp_channelizer_stream> channels;
     for (uint32_t chan_idx = 0; chan_idx < sample_rates.size(); ++chan_idx)
     {
         std::stringstream ss;
@@ -140,21 +141,22 @@ void run_cpp_multi_rate_channelizer_test(std::string input_file_name,
         std::vector<std::complex<float>> filter_coeffs;
         EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(ss.str(),
                                                             falcon_dsp::file_type_e::ASCII, filter_coeffs));
-        
-        multi_rate_channelizer_channel_s chan_params;
-        chan_params.output_sample_rate_in_sps = sample_rates[chan_idx];
-        chan_params.freq_shift_in_hz = freq_shifts[chan_idx];
-        chan_params.up_rate = up_down_rates[chan_idx].first;
-        chan_params.down_rate = up_down_rates[chan_idx].second;
-        chan_params.resample_filter_coeffs = filter_coeffs;
+        ASSERT_GT(filter_coeffs.size(), 0u);
+
+        falcon_dsp::falcon_dsp_channelizer_stream chan_params;
+        EXPECT_TRUE(chan_params.initialize(sample_rates[chan_idx],
+                                           freq_shifts[chan_idx],
+                                           up_down_rates[chan_idx].first,
+                                           up_down_rates[chan_idx].second,
+                                           filter_coeffs));
         
         channels.push_back(chan_params);
     }
-    
+
     /* now frequency shift and resample the input */
     falcon_dsp::falcon_dsp_multi_rate_channelizer channelizer;
     ASSERT_TRUE(channelizer.initialize(input_sample_rate_in_sps, channels));
-    
+
     falcon_dsp::falcon_dsp_host_timer timer;
     std::vector<std::vector<std::complex<float>>> out_data;
     EXPECT_TRUE(channelizer.apply(in_data, out_data));
@@ -168,6 +170,8 @@ void run_cpp_multi_rate_channelizer_test(std::string input_file_name,
         std::cout << "Found " << expected_out_data[out_idx].size()
                   << " samples of expected data and " << out_data[out_idx].size()
                   << " samples of output data" << std::endl;
+        
+        ASSERT_GT(out_data[out_idx].size(), 0u);
 
         for (uint32_t ii = 0;
              ii < in_data.size() &&
@@ -244,7 +248,7 @@ void run_cpp_multi_rate_channelizer_test_by_segment(std::string input_file_name,
     
     /* read in the coefficient files and create the multi-rate channelizer
      *  configuration vector */
-    std::vector<multi_rate_channelizer_channel_s> channels;
+    std::vector<falcon_dsp::falcon_dsp_channelizer_stream> channels;
     for (uint32_t chan_idx = 0; chan_idx < sample_rates.size(); ++chan_idx)
     {
         std::stringstream ss;
@@ -255,13 +259,14 @@ void run_cpp_multi_rate_channelizer_test_by_segment(std::string input_file_name,
         std::vector<std::complex<float>> filter_coeffs;
         EXPECT_TRUE(falcon_dsp::read_complex_data_from_file(ss.str(),
                                                             falcon_dsp::file_type_e::ASCII, filter_coeffs));
-        
-        multi_rate_channelizer_channel_s chan_params;
-        chan_params.output_sample_rate_in_sps = sample_rates[chan_idx];
-        chan_params.freq_shift_in_hz = freq_shifts[chan_idx];
-        chan_params.up_rate = up_down_rates[chan_idx].first;
-        chan_params.down_rate = up_down_rates[chan_idx].second;
-        chan_params.resample_filter_coeffs = filter_coeffs;
+        ASSERT_GT(filter_coeffs.size(), 0u);
+
+        falcon_dsp::falcon_dsp_channelizer_stream chan_params;
+        EXPECT_TRUE(chan_params.initialize(sample_rates[chan_idx],
+                                           freq_shifts[chan_idx],
+                                           up_down_rates[chan_idx].first,
+                                           up_down_rates[chan_idx].second,
+                                           filter_coeffs));
         
         channels.push_back(chan_params);
     }
@@ -318,6 +323,8 @@ void run_cpp_multi_rate_channelizer_test_by_segment(std::string input_file_name,
         std::cout << "Found " << expected_out_data[out_idx].size()
                   << " samples of expected data and " << out_data[out_idx].size()
                   << " samples of output data" << std::endl;
+
+        ASSERT_GT(out_data[out_idx].size(), 0u);
 
         for (uint32_t ii = 0;
              ii < in_data.size() &&
