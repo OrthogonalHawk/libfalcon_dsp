@@ -179,6 +179,9 @@ namespace falcon_dsp
             m_input_data_len = in.size();
         }
 
+        cudaStream_t main_channelizer_stream;
+        cudaErrChkAssert(cudaStreamCreateWithFlags(&main_channelizer_stream, cudaStreamNonBlocking));
+        
         /* allocate CUDA memory for the intermediate and output samples */
         for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
         {
@@ -194,10 +197,10 @@ namespace falcon_dsp
         }
 
         /* copy the input data to the GPU */
-        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(m_input_data),
-                                    static_cast<void *>(in.data()),
-                                    m_input_data_len * sizeof(std::complex<float>),
-                                    cudaMemcpyHostToDevice));
+        cudaErrChkAssert(cudaMemcpyAsync(static_cast<void *>(m_input_data),
+                                         static_cast<void *>(in.data()),
+                                         m_input_data_len * sizeof(std::complex<float>),
+                                         cudaMemcpyHostToDevice, main_channelizer_stream));
 
         /* copy the frequency shift channel information to the GPU */
         std::vector<falcon_dsp_freq_shift_params_cuda_s> tmp_freq_shift_params(m_channels.size());
@@ -206,10 +209,10 @@ namespace falcon_dsp
              tmp_freq_shift_params[chan_idx] = m_channels[chan_idx]->get_freq_shift_params();
         }
         
-        cudaErrChkAssert(cudaMemcpy(static_cast<void *>(d_freq_shift_channels),
-                                    static_cast<void *>(tmp_freq_shift_params.data()),
-                                    tmp_freq_shift_params.size() * sizeof(falcon_dsp_freq_shift_params_cuda_s),
-                                    cudaMemcpyHostToDevice));
+        cudaErrChkAssert(cudaMemcpyAsync(static_cast<void *>(d_freq_shift_channels),
+                                         static_cast<void *>(tmp_freq_shift_params.data()),
+                                         tmp_freq_shift_params.size() * sizeof(falcon_dsp_freq_shift_params_cuda_s),
+                                         cudaMemcpyHostToDevice, main_channelizer_stream));
         
         /* calculate frequency shift kernel parameters */
         uint32_t samples_per_freq_shift_thread_block = MAX_NUM_CUDA_THREADS; /* assumes one output per thread */
@@ -221,7 +224,8 @@ namespace falcon_dsp
         falcon_dsp::falcon_dsp_host_timer timer("FREQ_SHIFT KERNEL", TIMING_LOGS_ENABLED);
 
         /* run the frequency shift multi-channel kernel on the GPU */
-        __freq_shift_multi_chan<<<num_thread_blocks, MAX_NUM_CUDA_THREADS, freq_shift_shared_memory_size_in_bytes>>>(
+        __freq_shift_multi_chan<<<num_thread_blocks, MAX_NUM_CUDA_THREADS,
+                                  freq_shift_shared_memory_size_in_bytes, main_channelizer_stream>>>(
                             d_freq_shift_channels,
                             m_channels.size(),
                             m_input_data,
@@ -230,8 +234,9 @@ namespace falcon_dsp
         cudaErrChkAssert(cudaPeekAtLastError());
             
         /* wait for GPU to finish frequency shifting */
-        cudaErrChkAssert(cudaDeviceSynchronize());
-
+        cudaErrChkAssert(cudaStreamSynchronize(main_channelizer_stream));
+        cudaErrChk(cudaStreamDestroy(main_channelizer_stream));
+        
         timer.log_duration("FREQ_SHIFT Kernel Complete");
 
         /* frequency shifting complete; update trackers */
@@ -240,17 +245,18 @@ namespace falcon_dsp
             m_channels[chan_idx]->add_freq_shift_samples_handled(in.size());
         }
         
-        /* now resample each channel */
+        falcon_dsp::falcon_dsp_host_timer resample_timer("RESAMPLE", TIMING_LOGS_ENABLED);
+        
+        /* now resample each channel at once using CUDA streams */
+        cudaStream_t * cuda_streams = new cudaStream_t[m_channels.size()];
         for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
         {
-            std::stringstream resample_timer_name;
-            resample_timer_name << "RESAMP KERNEL " << chan_idx;
-            falcon_dsp::falcon_dsp_host_timer resample_timer(resample_timer_name.str(), TIMING_LOGS_ENABLED);
-        
+            cudaErrChkAssert(cudaStreamCreateWithFlags(&cuda_streams[chan_idx], cudaStreamNonBlocking));
+            
             if (MAX_NUM_OUTPUT_SAMPLES_PER_THREAD_FOR_RESAMPLER_KERNEL == 1)
             {
                 __polyphase_resampler_single_out<<<m_channels[chan_idx]->get_num_resampler_thread_blocks(),
-                                                   MAX_NUM_CUDA_THREADS>>>(
+                                                   MAX_NUM_CUDA_THREADS, 0, cuda_streams[chan_idx]>>>(
                              m_channels[chan_idx]->get_resampler_coeffs_ptr(),
                              m_channels[chan_idx]->get_resampler_coeffs_len(),
                              m_channels[chan_idx]->get_resampler_output_params_ptr(),
@@ -264,7 +270,7 @@ namespace falcon_dsp
             else
             {
                 __polyphase_resampler_multi_out<<<m_channels[chan_idx]->get_num_resampler_thread_blocks(),
-                                                  MAX_NUM_CUDA_THREADS>>>(
+                                                  MAX_NUM_CUDA_THREADS, 0, cuda_streams[chan_idx]>>>(
                              m_channels[chan_idx]->get_resampler_coeffs_ptr(),
                              m_channels[chan_idx]->get_resampler_coeffs_len(),
                              m_channels[chan_idx]->get_resampler_output_params_ptr(),
@@ -278,22 +284,29 @@ namespace falcon_dsp
             }
 
             cudaErrChkAssert(cudaPeekAtLastError());
-
-            /* wait for GPU to finish before accessing on host */
-            cudaErrChkAssert(cudaDeviceSynchronize());
-        
-            resample_timer.log_duration("Resampling Complete");
             
-            /* copy output samples out of CUDA memory */
-            cudaErrChkAssert(cudaMemcpy(out[chan_idx].data(),
-                                        m_channels[chan_idx]->get_resample_out_data_ptr(),
-                                        m_channels[chan_idx]->get_resample_out_data_len() * sizeof(std::complex<float>),
-                                        cudaMemcpyDeviceToHost));
-
-            /* finished resampling; now update the resampler state buffer*/
-            _manage_resampler_state(chan_idx, in.size());
+            /* copy output samples out of CUDA memory. okay to do this without synchronizing first because
+             *  each copy operation is scheduled in a specific stream context and the kernel running will
+             *  finish before the copy operation starts */
+            cudaErrChkAssert(cudaMemcpyAsync(out[chan_idx].data(),
+                                             m_channels[chan_idx]->get_resample_out_data_ptr(),
+                                             m_channels[chan_idx]->get_resample_out_data_len() * sizeof(std::complex<float>),
+                                             cudaMemcpyDeviceToHost, cuda_streams[chan_idx]));
         }
 
+        /* wait for GPU to finish before accessing on host */
+        for (uint32_t chan_idx = 0; chan_idx < m_channels.size(); ++chan_idx)
+        {
+            cudaErrChkAssert(cudaStreamSynchronize(cuda_streams[chan_idx]));
+            
+            /* finished resampling; now update the resampler state buffer*/
+            _manage_resampler_state(chan_idx, in.size());
+            
+            cudaErrChk(cudaStreamDestroy(cuda_streams[chan_idx]));
+        }
+        
+        resample_timer.log_duration("RESAMPLING Complete");
+        
         return out.size() > 0;
     }
 

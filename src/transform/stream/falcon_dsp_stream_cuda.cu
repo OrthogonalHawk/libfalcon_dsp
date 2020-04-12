@@ -47,6 +47,7 @@
  *****************************************************************************/
 
 #include "transform/stream/falcon_dsp_stream_cuda.h"
+#include "utilities/falcon_dsp_cuda_utils.h"
 
 /******************************************************************************
  *                                 CONSTANTS
@@ -73,7 +74,14 @@ namespace falcon_dsp
     falcon_dsp_stream_cuda::falcon_dsp_stream_cuda(void)
       : falcon_dsp_stream(),
         m_max_num_cuda_threads(1024)
-    { }
+    {
+        /* no action required */
+    }
+    
+    falcon_dsp_stream_cuda::~falcon_dsp_stream_cuda(void)
+    {
+        /* no action required */
+    }
     
     bool falcon_dsp_stream_cuda::initialize(void)
     {

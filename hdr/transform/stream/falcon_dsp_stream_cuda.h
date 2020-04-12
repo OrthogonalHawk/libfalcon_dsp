@@ -83,7 +83,7 @@ namespace falcon_dsp
     public:
         
         falcon_dsp_stream_cuda(void);
-        ~falcon_dsp_stream_cuda(void) = default;
+        ~falcon_dsp_stream_cuda(void);
 
         falcon_dsp_stream_cuda(const falcon_dsp_stream_cuda&) = default;
         
@@ -94,7 +94,7 @@ namespace falcon_dsp
 
         uint32_t get_max_num_cuda_threads(void) const { return m_max_num_cuda_threads; }
         bool set_max_num_cuda_threads(uint32_t max_num_cuda_threads);
-
+        
     protected:
 
         virtual bool cleanup_memory(void);
